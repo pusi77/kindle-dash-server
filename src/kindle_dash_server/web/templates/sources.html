@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% set active = 'sources' %}
+{% block content %}
+<h1>Sources</h1>
+{% if load_errors %}
+  <div class="flash err">
+    <strong>Some source files couldn't be loaded:</strong>
+    <ul>{% for sid, err in load_errors.items() %}<li><code>{{ sid }}</code>: <pre>{{ err }}</pre></li>{% endfor %}</ul>
+  </div>
+{% endif %}
+<div class="cards">
+  {% for r in rows %}{% include "_source_row.html" %}{% endfor %}
+</div>
+{% endblock %}

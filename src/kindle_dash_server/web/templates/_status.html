@@ -1,0 +1,39 @@
+<section id="status" class="status" hx-get="/status" hx-trigger="every 60s" hx-swap="outerHTML">
+  {% if flash %}
+    <p class="flash {{ 'ok' if flash.ok else 'err' }}">
+      {% if flash.ok %}Rendered in {{ '%.1f' % flash.duration }} s.{% else %}{{ flash.message }}{% endif %}
+    </p>
+    <script>document.getElementById('current').src = '/current.png?t=' + Date.now();</script>
+  {% endif %}
+  <h2>On screen</h2>
+  <dl>
+    <dt>Source</dt><dd>{{ current_name or '—' }}</dd>
+    <dt>Rendered</dt><dd>{{ rendered_at }}{% if current.reason %} <span class="muted">({{ current.reason }})</span>{% endif %}</dd>
+    <dt>Mode</dt>
+    <dd>
+      {% if settings.selection.mode == 'pinned' %}
+        pinned: <strong>{{ pinned_name }}</strong>
+        <button class="link" hx-post="/selection/rotation">switch to rotation</button>
+      {% else %}
+        {{ settings.selection.mode }} ({{ settings.selection.strategy | replace('_', ' ') }},
+        {{ enabled_count }} enabled source{{ 's' if enabled_count != 1 }})
+      {% endif %}
+    </dd>
+    <dt>Next render</dt><dd>{{ next_run }} <span class="muted">(every {{ settings.scheduler.interval_minutes }} min, {{ settings.scheduler.lead_seconds }} s early)</span></dd>
+    <dt>Kindle</dt>
+    <dd>{% if device.last_seen %}last fetch {{ device_seen }}{% if device.battery %}, battery {{ device.battery }}%{% endif %}{% else %}hasn't fetched yet{% endif %}</dd>
+  </dl>
+  <button class="primary" hx-post="/render-now" hx-target="#status" hx-swap="outerHTML"
+          hx-indicator="#spin" hx-disabled-elt="this">Render now</button>
+  <span id="spin" class="htmx-indicator">rendering…</span>
+
+  <h3>Recent events</h3>
+  <ul class="events">
+    {% for e in events %}
+      <li class="{{ e.level }}"><time>{{ fmt_time(e.ts, tz)[5:] }}</time>
+        {% if e.source_id %}<b>{{ e.source_id }}</b>{% endif %} {{ e.message }}</li>
+    {% else %}
+      <li class="muted">nothing yet</li>
+    {% endfor %}
+  </ul>
+</section>

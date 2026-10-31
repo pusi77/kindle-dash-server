@@ -1,0 +1,95 @@
+# Public-domain aphorisms for kindle-dash-server.
+# Only authors whose works are in the public domain, and only translations that are too:
+# Marcus Aurelius and Epictetus tr. George Long (1862/1877), Seneca tr. Richard M. Gummere
+# (Loeb, 1917-1925), La Rochefoucauld tr. J. W. Willis Bund and J. Hain Friswell (1871).
+# Format: entries separated by a line with "%"; an optional last line "— Author, Work".
+%
+Do not act as if thou wert going to live ten thousand years. Death hangs over thee. While thou livest, while it is in thy power, be good.
+— Marcus Aurelius, Meditations IV.17
+%
+The best way of avenging thyself is not to become like the wrong doer.
+— Marcus Aurelius, Meditations VI.6
+%
+Look within. Within is the fountain of good, and it will ever bubble up, if thou wilt ever dig.
+— Marcus Aurelius, Meditations VII.59
+%
+No longer talk at all about the kind of man that a good man ought to be, but be such.
+— Marcus Aurelius, Meditations X.16
+%
+How much trouble he avoids who does not look to see what his neighbour says or does or thinks, but only to what he does himself.
+— Marcus Aurelius, Meditations IV.18
+%
+Nothing, Lucilius, is ours, except time.
+— Seneca, Moral Letters to Lucilius 1
+%
+While we are postponing, life speeds by.
+— Seneca, Moral Letters to Lucilius 1
+%
+It is not the man who has too little, but the man who craves more, that is poor.
+— Seneca, Moral Letters to Lucilius 2
+%
+Men learn while they teach.
+— Seneca, Moral Letters to Lucilius 7
+%
+There are more things, Lucilius, likely to frighten us than there are to crush us; we suffer more often in imagination than in reality.
+— Seneca, Moral Letters to Lucilius 13
+%
+Men are disturbed not by the things which happen, but by the opinions about the things.
+— Epictetus, Enchiridion 5
+%
+We all have strength enough to endure the misfortunes of others.
+— La Rochefoucauld, Maxims 19
+%
+We are never so happy or so unhappy as we suppose.
+— La Rochefoucauld, Maxims 49
+%
+The surest way to be deceived is to think oneself cleverer than others.
+— La Rochefoucauld, Maxims 127
+%
+Hypocrisy is the homage vice pays to virtue.
+— La Rochefoucauld, Maxims 218
+%
+Few people know how to be old.
+— La Rochefoucauld, Maxims 423
+%
+We are all in the gutter, but some of us are looking at the stars.
+— Oscar Wilde, Lady Windermere's Fan
+%
+I can resist everything except temptation.
+— Oscar Wilde, Lady Windermere's Fan
+%
+Experience is the name every one gives to their mistakes.
+— Oscar Wilde, Lady Windermere's Fan
+%
+A cynic is a man who knows the price of everything and the value of nothing.
+— Oscar Wilde, Lady Windermere's Fan
+%
+To love oneself is the beginning of a lifelong romance.
+— Oscar Wilde, An Ideal Husband
+%
+The only way to get rid of a temptation is to yield to it.
+— Oscar Wilde, The Picture of Dorian Gray
+%
+There is only one thing in the world worse than being talked about, and that is not being talked about.
+— Oscar Wilde, The Picture of Dorian Gray
+%
+A foolish consistency is the hobgoblin of little minds.
+— Ralph Waldo Emerson, Self-Reliance
+%
+To be great is to be misunderstood.
+— Ralph Waldo Emerson, Self-Reliance
+%
+The mass of men lead lives of quiet desperation.
+— Henry David Thoreau, Walden
+%
+Our life is frittered away by detail. Simplify, simplify.
+— Henry David Thoreau, Walden
+%
+Well done is better than well said.
+— Benjamin Franklin, Poor Richard's Almanack
+%
+Lost time is never found again.
+— Benjamin Franklin, Poor Richard's Almanack
+%
+Always do right. This will gratify some people and astonish the rest.
+— Mark Twain

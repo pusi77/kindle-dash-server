@@ -1,0 +1,15 @@
+services:
+  kindle-dash-server:
+    build: .
+    image: kindle-dash-server:latest
+    container_name: kindle-dash-server
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      # settings.yaml, sources/, plugins/, fonts/, cache/ and state live here
+      - ./data:/data
+    environment:
+      TZ: Europe/Rome
+      # KDS_BASIC_AUTH: "admin:change-me"   # optional basic auth for the web UI
+      # KDS_LOG_LEVEL: DEBUG

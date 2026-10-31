@@ -1,0 +1,12 @@
+# Line art seeded by the date: same picture all day, a new one tomorrow. No network.
+type: generative
+name: Generative art
+description: Flow fields, Truchet tiles and ridgelines, seeded by the date.
+enabled: true
+style: random        # flow_field | truchet | ridgelines | random
+seed: daily          # daily | random | a number
+layout: art
+layout_options:
+  fit: cover
+refresh: 1d
+weight: 0.5
