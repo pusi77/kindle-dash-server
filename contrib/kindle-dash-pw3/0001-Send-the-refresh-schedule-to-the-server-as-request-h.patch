@@ -1,0 +1,89 @@
+From 2248d5da527744fa361b2b1bdd16160cb97252ce Mon Sep 17 00:00:00 2001
+From: Andrea Pusineri <andreapusineri@protonmail.com>
+Date: Sat, 31 Oct 2026 23:14:43 +0000
+Subject: [PATCH] Send the refresh schedule to the server as request headers
+
+X-Kindle-Schedule, X-Kindle-Timezone and X-Kindle-Sleep-After let a server
+(e.g. kindle-dash-server) render the image right before each fetch instead
+of on its own timer, including the night gap outside ACTIVE_HOURS.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ CHANGELOG.md                 | 4 ++++
+ IMAGE-SOURCES.md             | 9 +++++++++
+ src/dash.sh                  | 2 ++
+ src/local/fetch-dashboard.sh | 4 ++++
+ 4 files changed, 19 insertions(+)
+
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index e0291c1..cb147f9 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
+ 
+ ## [Unreleased]
+ 
++### Added
++- `X-Kindle-Schedule`, `X-Kindle-Timezone` and `X-Kindle-Sleep-After` request headers with the
++  refresh schedule, so a server can render right before each fetch (see `IMAGE-SOURCES.md`).
++
+ ## [pw3-v0.2.0] - 2026-10-25
+ 
+ ### Added
+diff --git a/IMAGE-SOURCES.md b/IMAGE-SOURCES.md
+index 3129934..ac7d9a6 100644
+--- a/IMAGE-SOURCES.md
++++ b/IMAGE-SOURCES.md
+@@ -32,9 +32,18 @@ The request:
+ ```
+ GET <DASH_URL>
+ X-Kindle-Battery: 84          # battery level 0-100, use it or ignore it
++X-Kindle-Schedule: */15 7-22 * * *   # REFRESH_SCHEDULE (cron, local time)
++X-Kindle-Timezone: Europe/Rome       # TIMEZONE
++X-Kindle-Sleep-After: 960            # SLEEP_SCREEN_INTERVAL, seconds
+ Authorization: Bearer <token> # only if DASH_TOKEN is set in local/env.sh
+ ```
+ 
++The schedule headers tell a server when the next fetches will happen, so it can render the image
++right before each one instead of on its own timer. A wake-up whose next slot is more than
++`X-Kindle-Sleep-After` seconds away shows `sleeping.png` and doesn't fetch (that's how
++`ACTIVE_HOURS` works), so with the example above the fetches are 07:00, 07:15 … 22:30.
++[kindle-dash-server](https://github.com/pusi77/kindle-dash-server) uses them.
++
+ For a server on the internet, set a token so only your Kindle gets the image:
+ 
+ ```sh
+diff --git a/src/dash.sh b/src/dash.sh
+index bc73820..b048bc3 100755
+--- a/src/dash.sh
++++ b/src/dash.sh
+@@ -27,6 +27,8 @@ TIMEZONE=${TIMEZONE:-UTC}
+ FULL_DISPLAY_REFRESH_RATE=${FULL_DISPLAY_REFRESH_RATE:-0}
+ # A wait longer than one interval means we're outside ACTIVE_HOURS: show sleeping.png instead.
+ SLEEP_SCREEN_INTERVAL=${SLEEP_SCREEN_INTERVAL:-$((INTERVAL_MINUTES * 60 + 60))}
++# fetch-dashboard.sh runs as a child process: export the schedule so it can send it to the server.
++export REFRESH_SCHEDULE TIMEZONE SLEEP_SCREEN_INTERVAL
+ WIFI_TIMEOUT=${WIFI_TIMEOUT:-30}
+ # PW3: /sys/devices/platform/mxc_rtc.0 doesn't exist; max77696 RTC channel 1 (rtc0 left to powerd)
+ RTC=${RTC:-/sys/class/rtc/rtc1/wakealarm}
+diff --git a/src/local/fetch-dashboard.sh b/src/local/fetch-dashboard.sh
+index e87e746..ed4d8ff 100755
+--- a/src/local/fetch-dashboard.sh
++++ b/src/local/fetch-dashboard.sh
+@@ -6,9 +6,13 @@ case "$DASH_URL" in
+ /*) exec cp "$DASH_URL" "$OUT" ;;
+ esac
+ 
++# X-Kindle-Schedule/-Timezone/-Sleep-After let a server render only right before each refresh.
+ fetch() {
+   curl -sSf --max-time 30 --retry 3 --retry-delay 2 \
+     -H "X-Kindle-Battery: $(gasgauge-info -s)" \
++    -H "X-Kindle-Schedule: $REFRESH_SCHEDULE" \
++    -H "X-Kindle-Timezone: $TIMEZONE" \
++    -H "X-Kindle-Sleep-After: $SLEEP_SCREEN_INTERVAL" \
+     "$@" -o "$OUT" "$DASH_URL"
+ }
+ 
+-- 
+2.43.0
+

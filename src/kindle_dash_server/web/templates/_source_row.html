@@ -3,11 +3,11 @@
     <img src="/thumb/{{ r.id }}.png" loading="lazy" alt="" width="268" height="362">
   </a>
   <div class="body">
-    <h2>{{ r.config.name }} {% if r.pinned %}<span class="tag">pinned</span>{% endif %}</h2>
+    <h2>{{ r.config.name }} {% if r.pinned %}<span class="tag">pinned</span>{% endif %}{% if not r.config.enabled %} <span class="tag muted">disabled</span>{% endif %}</h2>
     <p class="muted"><code>{{ r.id }}</code> · {{ r.config.type }} · layout {{ r.config.layout }}</p>
     {% if r.config.description %}<p>{{ r.config.description }}</p>{% endif %}
     <p class="muted">last OK {{ r.last_ok }} · shown {{ r.shown_count }}×</p>
-    {% if r.last_error %}<p class="error" title="{{ r.last_error }}">⚠ {{ r.last_error | truncate(220) }}</p>{% endif %}
+    {% if r.last_error %}<p class="error" title="{{ r.last_error }}">⚠ {{ r.last_error | truncate(220) }} <span class="muted">({{ r.last_error_at | ago }})</span></p>{% endif %}
     <div class="actions">
       <button hx-post="/sources/{{ r.id }}/toggle" hx-target="#src-{{ r.id }}" hx-swap="outerHTML">
         {{ 'Disable' if r.config.enabled else 'Enable' }}</button>
@@ -16,6 +16,8 @@
         <label>weight <input type="number" name="weight" min="0" max="1000" step="0.1" value="{{ '%g' % r.config.weight }}"></label>
         <button>Set</button>
       </form>
+      <a href="/sources/{{ r.id }}/edit">Edit</a>
+      <a href="/sources/new?src={{ r.id }}">Duplicate</a>
       <a href="/preview/{{ r.id }}.png?refresh=true" target="_blank">Fresh preview</a>
       <span id="spin-{{ r.id }}" class="htmx-indicator">rendering…</span>
     </div>

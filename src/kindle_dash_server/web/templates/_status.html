@@ -8,7 +8,7 @@
   <h2>On screen</h2>
   <dl>
     <dt>Source</dt><dd>{{ current_name or '—' }}</dd>
-    <dt>Rendered</dt><dd>{{ rendered_at }}{% if current.reason %} <span class="muted">({{ current.reason }})</span>{% endif %}</dd>
+    <dt>Rendered</dt><dd>{{ rendered_at }}{% if rendered_for %} for the {{ rendered_for }} fetch{% endif %}{% if current.reason %} <span class="muted">({{ current.reason }})</span>{% endif %}</dd>
     <dt>Mode</dt>
     <dd>
       {% if settings.selection.mode == 'pinned' %}
@@ -18,10 +18,21 @@
         {{ settings.selection.mode }} ({{ settings.selection.strategy | replace('_', ' ') }},
         {{ enabled_count }} enabled source{{ 's' if enabled_count != 1 }})
       {% endif %}
+      · <a href="/display">change</a>
     </dd>
-    <dt>Next render</dt><dd>{{ next_run }} <span class="muted">(every {{ settings.scheduler.interval_minutes }} min, {{ settings.scheduler.lead_seconds }} s early)</span></dd>
     <dt>Kindle</dt>
-    <dd>{% if device.last_seen %}last fetch {{ device_seen }}{% if device.battery %}, battery {{ device.battery }}%{% endif %}{% else %}hasn't fetched yet{% endif %}</dd>
+    <dd>
+      {% if device.last_seen %}last fetch {{ device_seen }}{% if device.battery is not none %},
+        battery <span class="{{ 'error' if battery_low }}">{{ device.battery }}%{% if battery_low %} — low{% endif %}</span>{% endif %}
+      {% else %}hasn't fetched yet{% endif %}
+    </dd>
+    <dt>Schedule</dt>
+    <dd><code>{{ schedule.cron.expr }}</code> {{ schedule.timezone }}
+      {% if origin == 'device' %}<span class="tag">from the Kindle</span>
+      {% else %}<span class="muted">(from <a href="/settings#scheduler">settings</a>{% if settings.scheduler.follow_device %}: the Kindle hasn't reported its schedule yet{% endif %})</span>{% endif %}
+    </dd>
+    <dt>Next fetch</dt>
+    <dd>{% if next_fetch %}{{ next_fetch.strftime('%a %H:%M') }}, rendered at {{ next_run.strftime('%H:%M:%S') }}{% else %}—{% endif %}</dd>
   </dl>
   <button class="primary" hx-post="/render-now" hx-target="#status" hx-swap="outerHTML"
           hx-indicator="#spin" hx-disabled-elt="this">Render now</button>

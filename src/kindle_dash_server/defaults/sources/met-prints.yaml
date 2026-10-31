@@ -1,0 +1,34 @@
+# The Metropolitan Museum of Art Collection API: public-domain prints and drawings.
+# API docs: https://metmuseum.github.io/  The search returns object IDs only, so each
+# candidate costs one extra request (detail_url). Images are full-size originals.
+type: json_api
+name: The Met — prints & drawings
+description: Public-domain works from the Met's Drawings and Prints department.
+enabled: false
+url: https://collectionapi.metmuseum.org/public/collection/v1/search
+params:
+  departmentId: 9      # Drawings and Prints
+  hasImages: true
+  q: "{{ ['etching', 'engraving', 'woodcut', 'lithograph', 'drawing'] | random }}"
+items: objectIDs
+pick: random
+detail_url: "https://collectionapi.metmuseum.org/public/collection/v1/objects/{{ item }}"
+where: "isPublicDomain && primaryImage != ''"
+fields:
+  image:
+    - primaryImage
+    - primaryImageSmall
+  title: title
+  author: artistDisplayName
+  credit: "{{ objectDate }}{% if medium %} · {{ medium }}{% endif %} · The Metropolitan Museum of Art · CC0"
+  url: objectURL
+constants:
+  license: CC0
+layout: art
+refresh: 2h
+response_ttl: 1d
+weight: 1
+filters:
+  min_aspect: 0.45
+  max_aspect: 1.6
+  max_attempts: 6

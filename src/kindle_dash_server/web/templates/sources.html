@@ -1,12 +1,27 @@
 {% extends "base.html" %}
 {% set active = 'sources' %}
 {% block content %}
-<h1>Sources</h1>
+<div class="titlebar">
+  <h1>Sources</h1>
+  <div class="actions">
+    <a class="button primary" href="/sources/new">New source</a>
+    <button hx-post="/sources/reload" title="Re-read sources/*.yaml and plugins/*.py">Reload files &amp; plugins</button>
+  </div>
+</div>
 {% if load_errors %}
   <div class="flash err">
     <strong>Some source files couldn't be loaded:</strong>
-    <ul>{% for sid, err in load_errors.items() %}<li><code>{{ sid }}</code>: <pre>{{ err }}</pre></li>{% endfor %}</ul>
+    <ul>{% for sid, err in load_errors.items() %}<li><a href="/sources/{{ sid }}/edit"><code>{{ sid }}</code></a>: <pre>{{ err }}</pre></li>{% endfor %}</ul>
   </div>
+{% endif %}
+{% if plugin_errors %}
+  <div class="flash err">
+    <strong>Some plugins couldn't be loaded:</strong>
+    <ul>{% for f, err in plugin_errors.items() %}<li><code>plugins/{{ f }}</code>: <pre>{{ err }}</pre></li>{% endfor %}</ul>
+  </div>
+{% endif %}
+{% if plugin_files %}
+  <p class="muted">Plugins: {% for f, types in plugin_files.items() %}<code>{{ f }}</code> ({{ types | join(', ') or '—' }}){{ ', ' if not loop.last }}{% endfor %}</p>
 {% endif %}
 <div class="cards">
   {% for r in rows %}{% include "_source_row.html" %}{% endfor %}

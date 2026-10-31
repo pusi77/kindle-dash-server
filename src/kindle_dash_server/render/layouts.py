@@ -17,6 +17,7 @@ from ..card import Card
 from ..config import OutputSettings
 from .fonts import get_font
 from .pipeline import fit_contain, fit_cover, tone
+from .pipeline import to_gray as to_l
 from .text import draw_block, ellipsize, fit_text, layout_text
 
 WHITE, BLACK, GREY, LIGHT = 255, 0, 0x55, 0x99
@@ -29,6 +30,12 @@ class RenderContext:
     output: OutputSettings = field(default_factory=OutputSettings)
     now: datetime = field(default_factory=datetime.now)
     options: dict[str, Any] = field(default_factory=dict)
+    # Corners taken by overlays (e.g. "top-right": 190 = the battery badge's width incl. margin):
+    # layouts keep their text out of them.
+    reserved: dict[str, int] = field(default_factory=dict)
+
+    def free(self, corner: str) -> int:
+        return self.reserved.get(corner, 0)
 
     @property
     def width(self) -> int:
@@ -92,8 +99,10 @@ def art(card: Card, ctx: RenderContext) -> Image.Image:
     title_font = get_font(ctx.font, "italic", ctx.px(opt.get("title_size", 32)))
     small_font = get_font(ctx.font, "regular", ctx.px(opt.get("credit_size", 22)))
     lines: list[tuple[str, Any, int]] = []
+    left = pad
     if show_caption:
-        maxw = W - 2 * pad
+        left = max(pad, ctx.free("bottom-left"))
+        maxw = W - left - max(pad, ctx.free("bottom-right"))
         if card.title:
             lines.append((ellipsize(card.title, title_font, maxw), title_font, BLACK))
         sub = _join(card.author, card.credit)
@@ -129,7 +138,7 @@ def art(card: Card, ctx: RenderContext) -> Image.Image:
             draw.line([(pad, H - band), (W - pad, H - band)], fill=LIGHT, width=ctx.px(2))
         for text, font, fill in lines:
             ascent, descent = font.getmetrics()
-            draw.text((pad, y + ascent), text, font=font, fill=fill, anchor="ls")
+            draw.text((left, y + ascent), text, font=font, fill=fill, anchor="ls")
             y += ascent + descent + ctx.px(8)
     return img
 
@@ -208,11 +217,38 @@ def _footer(
     W, H = ctx.size
     font = get_font(ctx.font, "regular", ctx.px(20))
     pad = ctx.px(40)
-    text = ellipsize(text, font, W - 2 * pad)
+    left = max(pad, ctx.free("bottom-left"))
+    right = max(pad, ctx.free("bottom-right"))
     if center:
+        side = max(left, right)
+        text = ellipsize(text, font, W - 2 * side)
         draw.text((W / 2, H - pad), text, font=font, fill=GREY, anchor="ms")
     else:
-        draw.text((pad, H - pad), text, font=font, fill=GREY, anchor="ls")
+        text = ellipsize(text, font, W - left - right)
+        draw.text((left, H - pad), text, font=font, fill=GREY, anchor="ls")
+
+
+def _header(draw: ImageDraw.ImageDraw, card: Card, ctx: RenderContext, m: int) -> int:
+    """Kicker (e.g. "ON THIS DAY") left, date right, a rule. Returns the y below it."""
+    W = ctx.width
+    opt = ctx.options
+    kicker = (opt.get("kicker") or card.meta.get("kicker") or card.source_name or "").upper()
+    head_font = get_font(ctx.font, "bold", ctx.px(22))
+    ascent, descent = head_font.getmetrics()
+    y = m
+    if not (kicker or opt.get("date", True)):
+        return y
+    date_s = ctx.now.strftime(opt.get("date_format", "%A %-d %B %Y"))
+    date_w = head_font.getlength(date_s) if opt.get("date", True) else 0
+    right = max(m, ctx.free("top-right"))
+    left = max(m, ctx.free("top-left"))
+    kicker = ellipsize(kicker, head_font, int(W - left - right - date_w - ctx.px(24)))
+    draw.text((left, y + ascent), kicker, font=head_font, fill=BLACK, anchor="ls")
+    if date_w:
+        draw.text((W - right, y + ascent), date_s, font=head_font, fill=GREY, anchor="rs")
+    y += ascent + descent + ctx.px(16)
+    draw.line([(m, y), (W - m, y)], fill=BLACK, width=ctx.px(3))
+    return y + ctx.px(40)
 
 
 # --------------------------------------------------------------------------------------------
@@ -228,21 +264,7 @@ def article(card: Card, ctx: RenderContext) -> Image.Image:
     m = ctx.px(opt.get("margin", 64))
     width = W - 2 * m
 
-    # Header: kicker (e.g. "ON THIS DAY") left, date right.
-    kicker = (opt.get("kicker") or card.meta.get("kicker") or card.source_name or "").upper()
-    head_font = get_font(ctx.font, "bold", ctx.px(22))
-    ascent, descent = head_font.getmetrics()
-    y = m
-    if kicker or opt.get("date", True):
-        date_s = ctx.now.strftime(opt.get("date_format", "%A %-d %B %Y"))
-        date_w = head_font.getlength(date_s) if opt.get("date", True) else 0
-        kicker = ellipsize(kicker, head_font, int(width - date_w - ctx.px(24)))
-        draw.text((m, y + ascent), kicker, font=head_font, fill=BLACK, anchor="ls")
-        if date_w:
-            draw.text((W - m, y + ascent), date_s, font=head_font, fill=GREY, anchor="rs")
-        y += ascent + descent + ctx.px(16)
-        draw.line([(m, y), (W - m, y)], fill=BLACK, width=ctx.px(3))
-        y += ctx.px(40)
+    y = _header(draw, card, ctx, m)
 
     footer_h = ctx.px(70) if card.credit else ctx.px(30)
     bottom = H - m - footer_h
@@ -285,6 +307,81 @@ def article(card: Card, ctx: RenderContext) -> Image.Image:
             spacing=1.35,
         )
         draw_block(draw, body, m, y, width)
+
+    _footer(draw, ctx, card.credit)
+    return img
+
+
+# --------------------------------------------------------------------------------------------
+# info: centred picture, title, subtitle and a table of label/value rows (card.meta["rows"])
+# --------------------------------------------------------------------------------------------
+
+
+@layout("info")
+def info(card: Card, ctx: RenderContext) -> Image.Image:
+    img, draw = _canvas(ctx)
+    W, H = ctx.size
+    opt = ctx.options
+    m = ctx.px(opt.get("margin", 64))
+    width = W - 2 * m
+    y = _header(draw, card, ctx, m)
+    rows = [(str(a), str(b)) for a, b in card.meta.get("rows", [])]
+    footer_h = ctx.px(70) if card.credit else ctx.px(30)
+    bottom = H - m - footer_h
+
+    row_font = get_font(ctx.font, "regular", ctx.px(opt.get("row_size", 32)))
+    val_font = get_font(ctx.font, "bold", ctx.px(opt.get("row_size", 32)))
+    row_h = round(row_font.size * 1.9)
+    rows_h = row_h * len(rows)
+
+    if card.image is not None:
+        avail = bottom - y - rows_h - ctx.px(240)
+        max_h = max(ctx.px(200), min(int((H - 2 * m) * opt.get("image_height", 0.45)), avail))
+        src = (
+            card.image
+            if opt.get("raw_image") or card.meta.get("raw_image")
+            else tone(card.image, ctx.output, ctx.options)
+        )
+        placed = ImageOps.contain(to_l(src), (width, max_h), Image.Resampling.LANCZOS)
+        img.paste(placed, ((W - placed.width) // 2, y))
+        y += placed.height + ctx.px(40)
+
+    if card.title:
+        title = fit_text(
+            card.title,
+            ctx.font,
+            "regular",
+            width,
+            ctx.px(150),
+            max_size=ctx.px(64),
+            min_size=ctx.px(32),
+            spacing=1.15,
+        )
+        y = draw_block(draw, title, m, y, width, align="center") + ctx.px(16)
+    if card.body:
+        body = fit_text(
+            card.body,
+            ctx.font,
+            "italic",
+            width,
+            ctx.px(110),
+            max_size=ctx.px(34),
+            min_size=ctx.px(24),
+            spacing=1.3,
+        )
+        y = draw_block(draw, body, m, y, width, align="center", fill=GREY) + ctx.px(20)
+
+    if rows:
+        y = max(y + ctx.px(10), bottom - rows_h)
+        ascent, _ = row_font.getmetrics()
+        for label, value in rows:
+            draw.line([(m, y), (W - m, y)], fill=LIGHT, width=ctx.px(1))
+            base = y + (row_h + ascent) // 2 - ctx.px(4)
+            draw.text((m, base), label, font=row_font, fill=GREY, anchor="ls")
+            value = ellipsize(value, val_font, int(width - row_font.getlength(label) - ctx.px(30)))
+            draw.text((W - m, base), value, font=val_font, fill=BLACK, anchor="rs")
+            y += row_h
+        draw.line([(m, y), (W - m, y)], fill=LIGHT, width=ctx.px(1))
 
     _footer(draw, ctx, card.credit)
     return img

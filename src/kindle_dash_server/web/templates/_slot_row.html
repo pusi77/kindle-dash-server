@@ -1,0 +1,10 @@
+<tr>
+  <td><input name="slot_days" value="{{ slot.days if slot else '*' }}" size="10" placeholder="MON-FRI"></td>
+  <td><input name="slot_start" value="{{ slot.start if slot else '' }}" size="5" placeholder="07:00"></td>
+  <td><input name="slot_end" value="{{ slot.end if slot else '' }}" size="5" placeholder="09:00"></td>
+  <td><select name="slot_source">
+    <option value="">— rotation —</option>
+    {% for sid, name in sources %}<option value="{{ sid }}" {% if slot and slot.source == sid %}selected{% endif %}>{{ name }}</option>{% endfor %}
+  </select></td>
+  <td><button type="button" class="link" onclick="this.closest('tr').remove()">remove</button></td>
+</tr>

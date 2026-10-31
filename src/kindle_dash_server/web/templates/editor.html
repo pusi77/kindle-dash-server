@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% set active = 'sources' %}
+{% block title %}{{ 'Edit ' ~ original if original else 'New source' }} · kindle-dash-server{% endblock %}
+{% block content %}
+<h1>{% if original %}Edit <code>{{ original }}</code>{% else %}New source{% endif %}</h1>
+{% if error %}<div class="flash err"><strong>Not saved:</strong><pre>{{ error }}</pre></div>{% endif %}
+{% if load_error and not error %}<div class="flash err"><strong>This file currently fails to load:</strong><pre>{{ load_error }}</pre></div>{% endif %}
+<div class="editor">
+  <form id="editor-form" method="post" action="/sources/save">
+    <input type="hidden" name="original_id" value="{{ original or '' }}">
+    <label class="field">ID <span class="muted">(file name: sources/<em>id</em>.yaml)</span>
+      <input name="source_id" value="{{ sid }}" required pattern="[a-z0-9][a-z0-9_\-]{0,63}" placeholder="my-source"></label>
+    <textarea name="yaml_text" spellcheck="false" rows="30">{{ text }}</textarea>
+    <div class="actions">
+      <button type="button" hx-post="/sources/validate" hx-include="#editor-form" hx-target="#result">Validate</button>
+      <button type="button" hx-post="/sources/preview" hx-include="#editor-form" hx-target="#result"
+              hx-indicator="#pspin" hx-disabled-elt="this">Preview</button>
+      <button class="primary" type="submit">Save</button>
+      <a href="/sources">Cancel</a>
+      <span id="pspin" class="htmx-indicator">rendering… (fetches live data, may take a few seconds)</span>
+    </div>
+  </form>
+  <aside>
+    <div id="result" class="result"><p class="muted">Validate checks the YAML; Preview fetches and renders it without saving.</p></div>
+    {% if original %}
+      <form method="post" action="/sources/{{ original }}/delete" onsubmit="return confirm('Delete source {{ original }}?')">
+        <button class="danger">Delete this source</button>
+      </form>
+    {% endif %}
+  </aside>
+</div>
+<h2>Reference</h2>
+<details open>
+  <summary>Options every source has</summary>
+  <table class="ref"><tr><th>option</th><th>default</th></tr>
+  {% for n, d in common %}<tr><td><code>{{ n }}</code></td><td><code>{{ d if d is not none else '—' }}</code></td></tr>{% endfor %}
+  </table>
+  <p class="muted"><code>layout</code>: art, quote, article, info or auto. <code>refresh</code>: how long a fetched item is reused (90, 15m, 6h, 1d).
+  <code>filters</code>: min_width, min_height, min_aspect, max_aspect (width/height), max_attempts.</p>
+</details>
+{% for t in types %}
+<details>
+  <summary><code>type: {{ t.name }}</code>{% if t.plugin %} <span class="tag">plugin</span>{% endif %} — {{ t.doc.split('\n')[0] }}</summary>
+  {% if t.doc %}<pre class="doc">{{ t.doc }}</pre>{% endif %}
+  <table class="ref"><tr><th>option</th><th>type</th><th>default</th></tr>
+  {% for f in t.fields %}<tr><td><code>{{ f.name }}</code></td><td>{{ f.type }}</td><td><code>{{ f.default if f.default is not none else '—' }}</code></td></tr>{% endfor %}
+  </table>
+</details>
+{% endfor %}
+{% endblock %}

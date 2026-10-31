@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% set active = 'display' %}
+{% block content %}
+<h1>What's shown</h1>
+{% if saved %}<div class="flash ok">Saved.</div>{% endif %}
+{% if error %}<div class="flash err"><strong>Not saved:</strong><pre>{{ error }}</pre></div>{% endif %}
+<form method="post" action="/display" class="settings">
+  <fieldset>
+    <legend>Mode</legend>
+    <label class="radio"><input type="radio" name="mode" value="pinned" {% if sel.mode == 'pinned' %}checked{% endif %}>
+      <strong>Pinned</strong>: always the same source
+      <select name="pinned"><option value="">—</option>
+        {% for sid, name in sources %}<option value="{{ sid }}" {% if sel.pinned == sid %}selected{% endif %}>{{ name }}</option>{% endfor %}
+      </select></label>
+    <label class="radio"><input type="radio" name="mode" value="rotation" {% if sel.mode == 'rotation' %}checked{% endif %}>
+      <strong>Rotation</strong>: a different source at each fetch</label>
+    <label class="radio"><input type="radio" name="mode" value="schedule" {% if sel.mode == 'schedule' %}checked{% endif %}>
+      <strong>Schedule</strong>: time slots below, the rotation outside them</label>
+    <p class="muted">Rendering always follows the Kindle's own refresh schedule (see <a href="/settings#scheduler">Settings</a>);
+      this page only chooses <em>what</em> each refresh shows.</p>
+  </fieldset>
+
+  <fieldset>
+    <legend>Rotation</legend>
+    <label>Strategy
+      <select name="strategy">
+        <option value="weighted_random" {% if sel.strategy == 'weighted_random' %}selected{% endif %}>weighted random (by each source's weight)</option>
+        <option value="round_robin" {% if sel.strategy == 'round_robin' %}selected{% endif %}>round robin</option>
+      </select></label>
+    <p>Sources in the rotation <span class="muted">(none ticked = every enabled source)</span>:</p>
+    <div class="checks">
+      {% for sid, name in sources %}
+        <label class="{{ 'muted' if sid not in enabled }}"><input type="checkbox" name="rotation_sources" value="{{ sid }}"
+          {% if sid in sel.rotation_sources %}checked{% endif %}> {{ name }}{% if sid not in enabled %} (disabled){% endif %}</label>
+      {% endfor %}
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Schedule slots</legend>
+    <p class="muted">Times are local ({{ settings.location.timezone }}), end excluded; an end before the start crosses midnight.
+      Days use cron syntax: <code>*</code>, <code>MON-FRI</code>, <code>SAT,SUN</code>. The first matching slot wins.</p>
+    <table class="slots">
+      <thead><tr><th>days</th><th>from</th><th>to</th><th>show</th><th></th></tr></thead>
+      <tbody id="slots">
+        {% for slot in sel.slots %}
+          {% with slot=slot %}{% include "_slot_row.html" %}{% endwith %}
+        {% endfor %}
+      </tbody>
+    </table>
+    <button type="button" hx-get="/display/slot-row" hx-target="#slots" hx-swap="beforeend">Add slot</button>
+    {% if active_slot is not none %}<p class="muted">The next fetch falls in slot {{ active_slot + 1 }}.</p>{% endif %}
+  </fieldset>
+
+  <div class="actions">
+    <button class="primary" type="submit">Save</button>
+    <button type="submit" name="render" value="1">Save &amp; render now</button>
+  </div>
+</form>
+{% endblock %}

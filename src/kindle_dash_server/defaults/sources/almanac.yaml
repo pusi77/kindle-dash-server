@@ -1,0 +1,7 @@
+# Moon phase, sunrise and sunset for the location in Settings. No network.
+type: almanac
+name: Almanac
+description: Moon phase, sunrise and sunset for your location.
+enabled: true
+refresh: 1h
+weight: 0.5

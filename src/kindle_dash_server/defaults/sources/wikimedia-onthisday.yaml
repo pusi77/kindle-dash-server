@@ -1,0 +1,25 @@
+# "On this day" from Wikipedia's featured-content feed (selected anniversaries).
+# Text: CC BY-SA, Wikipedia contributors. Change "en" for another language.
+type: json_api
+name: Wikipedia — on this day
+description: A selected anniversary for today, with the article's summary.
+enabled: true
+url: "https://en.wikipedia.org/api/rest_v1/feed/featured/{{ today.strftime('%Y/%m/%d') }}"
+items: onthisday
+pick: random
+fields:
+  title: "{{ year }}"
+  body: "{{ text }}{% if pages and pages[0].extract %}\n\n{{ pages[0].extract }}{% endif %}"
+  image:
+    - pages[0].originalimage.source
+    - pages[0].thumbnail.source
+  credit: "'Wikipedia contributors · CC BY-SA 4.0'"
+  url: "pages[0].content_urls.desktop.page"
+  kicker: "'On this day'"
+required: []
+layout: article
+layout_options:
+  image_height: 0.36
+refresh: 2h
+response_ttl: 6h
+weight: 1

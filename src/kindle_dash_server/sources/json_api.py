@@ -68,11 +68,29 @@ def flatten_params(params: dict[str, Any]) -> dict[str, str]:
 class PagesConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    """Pick a random (or daily) page. The parameter sent is ``index * step``: use step for
+    offset-style APIs (``skip=0,100,200…``)."""
+
     param: str = "page"
-    min: int = 1
-    max: int = Field(1, ge=1)
-    # JMESPath to the number of pages in the response; a random page past it is re-picked.
+    min: int = Field(1, ge=0)
+    max: int = Field(1, ge=0)
+    step: int = Field(1, ge=1)
+    # JMESPath to the number of pages in the response; a page past it is re-picked.
     total_path: str | None = None
+    # …or to the number of items, with the page size.
+    total_items_path: str | None = None
+    per_page: int = Field(100, ge=1)
+
+    def last_index(self, data: Any) -> int | None:
+        if self.total_path:
+            total = jmespath.search(self.total_path, data)
+            if isinstance(total, int | float):
+                return self.min + int(total) - 1
+        if self.total_items_path:
+            total = jmespath.search(self.total_items_path, data)
+            if isinstance(total, int | float):
+                return self.min + max(0, -(-int(total) // self.per_page) - 1)
+        return None
 
 
 class JsonApiConfig(SourceConfig):
@@ -94,11 +112,24 @@ class JsonApiConfig(SourceConfig):
     fields: dict[str, str | list[str]] = Field(default_factory=dict)
     # Constant values for fields the API doesn't provide (e.g. license: CC0).
     constants: dict[str, str] = Field(default_factory=dict)
+    # JMESPath condition an item must satisfy (checked after detail_url), e.g.
+    # "isPublicDomain && primaryImage != ''".
+    where: str | None = None
     # Fields an item must have to be used. Default: ["image"] for the art layout.
     required: list[str] | None = None
     image_headers: dict[str, str] = Field(default_factory=dict)
     # How long API responses are cached on disk.
     response_ttl: Duration = 6 * 3600
+
+    @field_validator("items", "where")
+    @classmethod
+    def _check_jmespath(cls, v: str | None) -> str | None:
+        if v:
+            try:
+                jmespath.compile(v)
+            except Exception as exc:
+                raise ValueError(f"invalid JMESPath: {exc}") from exc
+        return v
 
     @field_validator("fields")
     @classmethod
@@ -148,12 +179,11 @@ class JsonApiSource(Source):
         if c.pages:
             p = c.pages
             page = rng.randint(p.min, max(p.min, p.max))
-            data = self._get(c.url, {**params, p.param: page})
-            if p.total_path:
-                total = jmespath.search(p.total_path, data)
-                if isinstance(total, int | float) and p.min <= total < page:
-                    page = rng.randint(p.min, int(total))
-                    data = self._get(c.url, {**params, p.param: page})
+            data = self._get(c.url, {**params, p.param: page * p.step})
+            last = p.last_index(data)
+            if last is not None and p.min <= last < page:
+                page = rng.randint(p.min, last)
+                data = self._get(c.url, {**params, p.param: page * p.step})
         else:
             data = self._get(c.url, params)
         items = jmespath.search(c.items, data) if c.items else data
@@ -224,6 +254,8 @@ class JsonApiSource(Source):
                 detail = {**detail, "_item": item}
             item = detail
 
+        if c.where and not jmespath.search(c.where, item):
+            raise SourceError("item doesn't match 'where'")
         f = self.resolve_fields(item)
         missing = [r for r in required if f.get(r) in (None, "", [])]
         if missing:
