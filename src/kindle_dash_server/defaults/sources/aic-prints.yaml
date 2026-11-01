@@ -1,6 +1,7 @@
 # Art Institute of Chicago API: public-domain prints (etchings, woodcuts, engravings…).
 # API docs: https://api.artic.edu/docs/  Images: IIIF, CC0 for public-domain works.
-# AIC asks API users to identify themselves with the AIC-User-Agent header.
+# AIC asks API users to identify themselves with the AIC-User-Agent header; its Cloudflare
+# protection also challenges requests without it.
 type: json_api
 name: Art Institute of Chicago — prints
 description: Public-domain etchings, woodcuts, engravings and lithographs (CC0).
@@ -12,24 +13,23 @@ params:
   limit: 100
   fields: id,title,artist_title,artist_display,date_display,image_id,thumbnail,medium_display
   # Elasticsearch query, sent as query[bool][must][0][term][is_public_domain]=true etc.
+  # One technique per request, picked at random (Jinja's random filter).
   query:
     bool:
       must:
         - term: {is_public_domain: true}
         - exists: {field: image_id}
-      should:
-        - match: {classification_titles: etching}
-        - match: {classification_titles: woodcut}
-        - match: {classification_titles: engraving}
-        - match: {classification_titles: lithograph}
-        - match: {classification_titles: drypoint}
-      minimum_should_match: 1
+        - match:
+            classification_titles: "{{ ['etching', 'woodcut', 'engraving', 'lithograph', 'drypoint'] | random }}"
+# AIC search stops at 1,000 results (page * limit <= 1000): pages 1-10 of 100.
 pages:
   param: page
-  max: 50
+  max: 10
   total_path: pagination.total_pages
 items: "data[?image_id]"
 pick: random
+image_headers:
+  AIC-User-Agent: kindle-dash-server (+https://github.com/pusi77/kindle-dash-server)
 fields:
   # IIIF: 1686 px wide for public-domain works, falling back to the standard 843.
   image:

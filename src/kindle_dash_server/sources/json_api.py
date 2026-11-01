@@ -8,6 +8,7 @@ far), ``today`` and ``now``. URL, params, headers and ``detail_url`` are templat
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Literal
 
 import jmespath
@@ -22,6 +23,9 @@ from .base import FilteredOut, Source, SourceConfig, SourceError
 log = logging.getLogger(__name__)
 
 _env = SandboxedEnvironment(autoescape=False, trim_blocks=True, lstrip_blocks=True)
+_env.filters["regex_replace"] = lambda value, pattern, repl="", count=0: re.sub(
+    pattern, repl, str(value), count=count
+)
 CARD_FIELDS = ("image", "title", "body", "author", "credit", "url", "license")
 
 

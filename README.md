@@ -10,6 +10,11 @@ sources and choose what is shown.
 
 ![samples](docs/samples/contact-sheet.png)
 
+The bundled sources, rendered live (AIC, Cleveland, the Met, Wikimedia, Wikipedia, Lichess,
+almanac):
+
+![live sources](docs/samples/live-sources.png)
+
 ## Client contract (kindle-dash-pw3)
 
 | | |

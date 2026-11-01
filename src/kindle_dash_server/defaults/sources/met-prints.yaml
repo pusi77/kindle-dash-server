@@ -1,15 +1,27 @@
 # The Metropolitan Museum of Art Collection API: public-domain prints and drawings.
-# API docs: https://metmuseum.github.io/  The search returns object IDs only, so each
-# candidate costs one extra request (detail_url). Images are full-size originals.
+# API docs: https://metmuseum.github.io/  The search (v1.1, paginated) returns object IDs only,
+# so each candidate costs one extra request (detail_url). Images are full-size originals.
+# The search ignores isPublicDomain; limiting the dates to 1450-1850 makes nearly every hit
+# public domain, and `where` checks it anyway.
 type: json_api
 name: The Met — prints & drawings
 description: Public-domain works from the Met's Drawings and Prints department.
 enabled: false
-url: https://collectionapi.metmuseum.org/public/collection/v1/search
+url: https://collectionapi.metmuseum.org/public/collection/v1.1/search
 params:
   departmentId: 9      # Drawings and Prints
   hasImages: true
   q: "{{ ['etching', 'engraving', 'woodcut', 'lithograph', 'drawing'] | random }}"
+  dateBegin: 1450
+  dateEnd: 1850
+  limit: 100
+pages:
+  param: offset        # offset = index * step
+  min: 0
+  max: 50
+  step: 100
+  total_items_path: total
+  per_page: 100
 items: objectIDs
 pick: random
 detail_url: "https://collectionapi.metmuseum.org/public/collection/v1/objects/{{ item }}"

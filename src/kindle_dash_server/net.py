@@ -146,6 +146,14 @@ class HttpClient:
                         self._store(key, data)
                     return data
                 last_exc = FetchError(f"HTTP {resp.status_code} for {resp.request.url}")
+                if resp.status_code in (403, 503) and (
+                    "cf-mitigated" in resp.headers or b"challenges.cloudflare.com" in resp.content
+                ):
+                    last_exc = FetchError(
+                        f"{urlsplit(url).netloc}: blocked by Cloudflare bot protection "
+                        f"(HTTP {resp.status_code}); this usually depends on the server's IP"
+                    )
+                    break
                 if resp.status_code not in RETRY_STATUS:
                     break
                 delay = _retry_after(resp) or 2**attempt + random.random()

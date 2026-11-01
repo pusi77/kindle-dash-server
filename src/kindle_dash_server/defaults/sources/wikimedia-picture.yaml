@@ -9,12 +9,11 @@ url: "https://en.wikipedia.org/api/rest_v1/feed/featured/{{ today.strftime('%Y/%
 items: image
 pick: first
 fields:
-  # A 1280 px thumbnail (a standard Wikimedia size), else the original.
+  # A 1280 px thumbnail (Wikimedia only serves standard sizes), else the original.
   image:
-    - "{{ thumbnail.source | replace('/' ~ thumbnail.width ~ 'px-', '/1280px-') if thumbnail else '' }}"
+    - "{{ thumbnail.source | regex_replace('/\\d+px-', '/1280px-', 1) if thumbnail else '' }}"
     - image.source
   body: description.text
-  author: artist.text
   credit: "{{ artist.text | striptags | truncate(80) }} · {{ license.type }} · Wikimedia Commons"
   license: license.type
   url: file_page
