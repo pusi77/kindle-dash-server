@@ -12,7 +12,7 @@ fields:
   body: "{{ text }}{% if pages and pages[0].extract %}\n\n{{ pages[0].extract }}{% endif %}"
   # 960 px thumbnail (standard size; also works for SVG/PDF originals), else the original.
   image:
-    - "{{ pages[0].thumbnail.source | regex_replace('/\\d+px-', '/960px-', 1) if pages and pages[0].thumbnail else '' }}"
+    - "{{ pages[0].thumbnail.source | regex_replace('/[0-9]+px-', '/960px-', 1) if pages and pages[0].thumbnail else '' }}"
     - pages[0].originalimage.source
   credit: "'Wikipedia contributors · CC BY-SA 4.0'"
   url: "pages[0].content_urls.desktop.page"

@@ -24,6 +24,8 @@ from pydantic import (
 )
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from .fsutil import atomic_write
+
 PACKAGE_DIR = Path(__file__).resolve().parent
 BUNDLED_FONTS_DIR = PACKAGE_DIR / "fonts"
 DEFAULTS_DIR = PACKAGE_DIR / "defaults"
@@ -164,6 +166,13 @@ class SchedulerSettings(StrictModel):
 
         return Cron.parse(v).expr
 
+    @model_validator(mode="after")
+    def _fetches(self) -> SchedulerSettings:
+        from .cron import DeviceSchedule
+
+        DeviceSchedule.create(self.schedule, self.timezone or "UTC", self.sleep_after)
+        return self
+
     @field_validator("timezone")
     @classmethod
     def _timezone(cls, v: str | None) -> str | None:
@@ -264,9 +273,7 @@ class SettingsStore:
 
     def save(self, settings: Settings) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(yaml.safe_dump(settings.model_dump(mode="json"), sort_keys=False))
-        tmp.replace(self.path)
+        atomic_write(self.path, yaml.safe_dump(settings.model_dump(mode="json"), sort_keys=False))
         self._settings = settings
 
     def update(self, **sections: object) -> Settings:

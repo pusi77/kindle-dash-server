@@ -16,6 +16,7 @@ from urllib.parse import urlsplit
 import httpx
 
 from . import __version__
+from .fsutil import atomic_write
 
 log = logging.getLogger(__name__)
 
@@ -78,10 +79,7 @@ class HttpClient:
         return None
 
     def _store(self, path: Path, data: bytes) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(".tmp")
-        tmp.write_bytes(data)
-        tmp.replace(path)
+        atomic_write(path, data)
 
     def prune(self, max_bytes: int = 500 * 1024 * 1024, max_age: float = 30 * 86400) -> int:
         """Drop entries older than max_age, then oldest first until under max_bytes."""

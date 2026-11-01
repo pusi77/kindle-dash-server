@@ -89,6 +89,9 @@ def create_app(env: Env | None = None) -> FastAPI:
         )
         yield
         await scheduler.stop()
+        # A render may still be running in a worker thread: let it finish before closing.
+        if not await run_in_threadpool(engine.wait_idle, 30.0):
+            log.warning("shutting down with a render still in progress")
         engine.http.close()
         state.close()
 

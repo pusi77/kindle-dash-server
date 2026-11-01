@@ -10,6 +10,8 @@ from typing import Any
 
 from PIL import Image
 
+from .fsutil import atomic_write
+
 
 @dataclass
 class Card:
@@ -36,12 +38,10 @@ class Card:
         if self.image is not None:
             buf = io.BytesIO()
             self.image.save(buf, "PNG")
-            img_path.write_bytes(buf.getvalue())
+            atomic_write(img_path, buf.getvalue())
         elif img_path.exists():
             img_path.unlink()
-        tmp = json_path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(self.to_json(), ensure_ascii=False, default=str))
-        tmp.replace(json_path)
+        atomic_write(json_path, json.dumps(self.to_json(), ensure_ascii=False, default=str))
 
     @classmethod
     def load(cls, json_path: Path) -> Card:

@@ -11,7 +11,7 @@ pick: first
 fields:
   # A 1280 px thumbnail (Wikimedia only serves standard sizes), else the original.
   image:
-    - "{{ thumbnail.source | regex_replace('/\\d+px-', '/1280px-', 1) if thumbnail else '' }}"
+    - "{{ thumbnail.source | regex_replace('/[0-9]+px-', '/1280px-', 1) if thumbnail else '' }}"
     - image.source
   body: description.text
   credit: "{{ artist.text | striptags | truncate(80) }} · {{ license.type }} · Wikimedia Commons"

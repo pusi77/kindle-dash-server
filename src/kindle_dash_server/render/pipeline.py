@@ -61,7 +61,12 @@ def paper_level(hist: list[int], min_share: float = 0.25) -> int | None:
         n = sum(hist[max(0, v - 4) : v + 5])
         if n > best_n:
             best, best_n = v, n
-    return best if best_n / total >= min_share else None
+    if best is None or best_n / total < min_share:
+        return None
+    # The most common value inside the densest window, not the window's first centre.
+    lo = max(0, best - 4)
+    window = hist[lo : best + 5]
+    return lo + window.index(max(window))
 
 
 def tone(img: Image.Image, out: OutputSettings, overrides: dict | None = None) -> Image.Image:

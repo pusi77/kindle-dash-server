@@ -162,7 +162,9 @@ class DeviceSchedule:
         if not sleep_after:
             # dash.sh default: INTERVAL_MINUTES * 60 + 60
             sleep_after = typical_interval(cron, datetime.now(tz)) + 60
-        return cls(cron, timezone, float(sleep_after))
+        schedule_ = cls(cron, timezone, float(sleep_after))
+        schedule_.next_fetch(datetime.now(tz))  # raises if the device would never fetch
+        return schedule_
 
     def wakes(self, after: datetime) -> Iterator[datetime]:
         t = after.astimezone(ZoneInfo(self.timezone))
@@ -171,11 +173,23 @@ class DeviceSchedule:
             yield t
 
     def fetches(self, after: datetime) -> Iterator[datetime]:
-        """Wake-ups at which the device fetches a new image (not the sleep screen)."""
+        """Wake-ups at which the device fetches a new image (not the sleep screen).
+
+        Raises CronError if a whole week passes without one: then every wake-up is followed
+        by a gap longer than ``sleep_after`` and the Kindle only ever shows its sleep screen
+        (e.g. REFRESH_SCHEDULE every 30 min with SLEEP_SCREEN_INTERVAL=960).
+        """
+        last_fetch = after.timestamp()
         for wake in self.wakes(after):
             following = self.cron.next_after(wake)
             if following.timestamp() - wake.timestamp() <= self.sleep_after:
+                last_fetch = wake.timestamp()
                 yield wake
+            elif wake.timestamp() - last_fetch > 8 * 86400:
+                raise CronError(
+                    f"with {self.cron.expr!r} and a sleep screen after {self.sleep_after:g} s "
+                    "the Kindle never fetches: every refresh is followed by a longer gap"
+                )
 
     def next_fetch(self, after: datetime) -> datetime:
         return next(self.fetches(after))

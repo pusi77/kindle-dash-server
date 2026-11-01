@@ -20,6 +20,7 @@ from zoneinfo import ZoneInfo
 from .card import Card
 from .config import Paths, Settings, SettingsStore
 from .cron import DeviceSchedule
+from .fsutil import atomic_write
 from .net import HttpClient
 from .render.fonts import add_font_dir
 from .render.layouts import RenderContext, render_card
@@ -306,9 +307,7 @@ class Engine:
         card = self.get_card(sid, force=force, at=at)
         png = self.render_png(card, self.sources[sid].config, at)
         out = self.paths.previews / f"{sid}.png"
-        tmp = out.with_suffix(".tmp")
-        tmp.write_bytes(png)
-        tmp.replace(out)
+        atomic_write(out, png)
         return png
 
     def render_config(self, sid: str, config: SourceConfig) -> bytes:
@@ -336,9 +335,7 @@ class Engine:
     def _write_current(
         self, png: bytes, source_id: str | None, reason: str, at: datetime | None = None
     ) -> None:
-        tmp = self.paths.current_png.with_suffix(".tmp")
-        tmp.write_bytes(png)
-        tmp.replace(self.paths.current_png)
+        atomic_write(self.paths.current_png, png)
         self._current = png
         self.state.set(
             "current",
@@ -402,6 +399,13 @@ class Engine:
             order.append(pick)
             remaining.remove(pick)
         return order
+
+    def wait_idle(self, timeout: float = 30.0) -> bool:
+        """Wait for a render in progress to finish (used at shutdown). False on timeout."""
+        if self._render_lock.acquire(timeout=timeout):
+            self._render_lock.release()
+            return True
+        return False
 
     def _fallback_order(self, candidates: list[str]) -> list[str]:
         """The chosen source first, then the others: healthy ones (no error since their last

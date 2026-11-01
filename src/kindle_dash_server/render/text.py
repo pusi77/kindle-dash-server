@@ -81,6 +81,12 @@ def fit_text(
 
     At ``min_size`` the text is truncated with an ellipsis if it still doesn't fit.
     """
+    # Text beyond what could fit even at min_size (glyphs >= 0.2 em wide) is never shown:
+    # drop it up front so very long bodies don't get re-wrapped at every search step.
+    lines = max(1, int(max_height / (min_size * spacing)) + 1)
+    capacity = (int(max_width / (min_size * 0.2)) + 1) * lines
+    if len(text) > capacity:
+        text = text[:capacity]
     lo, hi = min_size, max_size
     best: TextBlock | None = None
     while lo <= hi:

@@ -205,6 +205,13 @@ class Board:
         right = ("Q" if long else "K") if self.turn == "w" else ("q" if long else "k")
         if right not in self.castling:
             raise ChessError("castling not allowed")
+        between = (1, 2, 3) if long else (5, 6)
+        if any(self.at((f, r)) is not None for f in between):
+            raise ChessError("castling through pieces")
+        enemy = "b" if self.turn == "w" else "w"
+        king_path = (4, 3, 2) if long else (4, 5, 6)  # not out of, through or into check
+        if any(self.attacked((f, r), enemy) for f in king_path):
+            raise ChessError("castling through check")
         if long:
             self._set((2, r), k)
             self._set((3, r), rook)

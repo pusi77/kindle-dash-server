@@ -31,17 +31,37 @@ CREATE TABLE IF NOT EXISTS events (
 MAX_EVENTS = 300
 
 
+class _ClosedDB:
+    """Stands in for the connection after close(): late calls from worker threads (a render
+    finishing during shutdown) become no-ops instead of touching a closed sqlite handle."""
+
+    def execute(self, *args: Any, **kwargs: Any) -> _ClosedDB:
+        return self
+
+    def fetchone(self) -> None:
+        return None
+
+    def fetchall(self) -> list:
+        return []
+
+
 class State:
     def __init__(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
-        self._db = sqlite3.connect(path, check_same_thread=False, isolation_level=None)
+        self._db: sqlite3.Connection | _ClosedDB = sqlite3.connect(
+            path, check_same_thread=False, isolation_level=None
+        )
         self._db.row_factory = sqlite3.Row
         self._db.execute("PRAGMA journal_mode=WAL")
         self._db.executescript(SCHEMA)
         self._lock = threading.Lock()
 
     def close(self) -> None:
-        self._db.close()
+        # Under the lock: closing while another thread is inside execute() can segfault.
+        with self._lock:
+            db, self._db = self._db, _ClosedDB()
+            if isinstance(db, sqlite3.Connection):
+                db.close()
 
     # -- kv ----------------------------------------------------------------------------------
 
