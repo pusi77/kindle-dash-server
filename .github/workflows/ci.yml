@@ -25,7 +25,11 @@ jobs:
       - run: docker build -t kindle-dash-server .
       - name: Smoke test
         run: |
-          docker run -d --name kds -p 8080:8080 kindle-dash-server
-          for i in $(seq 1 30); do curl -sf localhost:8080/healthz && break; sleep 1; done
+          # A root-owned bind mount, as docker compose creates for a missing ./data.
+          mkdir data && sudo chown root:root data
+          docker run -d --name kds -p 8080:8080 -v "$PWD/data:/data" kindle-dash-server
+          for _ in $(seq 1 30); do curl -sf localhost:8080/healthz && break; sleep 1; done
           curl -sf -o dash.png localhost:8080/dash.png
           file dash.png | grep "1072 x 1448, 8-bit grayscale"
+          test "$(stat -c %u data)" = 1000
+          test "$(docker exec kds cat /proc/1/status | awk '/^Uid/ {print $2}')" = 1000

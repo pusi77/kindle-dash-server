@@ -35,16 +35,29 @@ and what is shown.
 
 ## Quick start
 
-With Docker (recommended):
+With Docker (recommended), using the published image
+(`ghcr.io/pusi77/kindle-dash-server`, amd64 and arm64):
 
 ```sh
-git clone https://github.com/pusi77/kindle-dash-server && cd kindle-dash-server
-docker compose up -d --build
+mkdir kindle-dash-server && cd kindle-dash-server
+curl -O https://raw.githubusercontent.com/pusi77/kindle-dash-server/main/docker-compose.yml
+docker compose up -d
 ```
 
 The web UI is at `http://<server>:8080`, the Kindle's image at `http://<server>:8080/dash.png`.
 Everything the server keeps (settings, sources, plugins, cache) lives in `./data`, mounted as
-`/data`.
+`/data`. The container starts as root only to give `./data` to the user it runs as (uid/gid 1000,
+or `PUID`/`PGID`), then drops to that user.
+
+Update with `docker compose pull && docker compose up -d`. Image tags:
+
+| Tag | |
+|---|---|
+| `latest` | the `main` branch |
+| `X.Y.Z`, `X.Y` | releases (git tags `vX.Y.Z`) |
+| `sha-<commit>` | a specific commit on `main` |
+
+To build from a checkout instead, swap `image:` for `build: .` in `docker-compose.yml`.
 
 Without Docker, with [uv](https://docs.astral.sh/uv/) and Python 3.12+:
 
@@ -62,6 +75,7 @@ Environment variables:
 | `KDS_LOG_LEVEL` | `INFO` | |
 | `KDS_HOST` / `KDS_PORT` | `0.0.0.0` / `8080` | or `--host` / `--port` |
 | `TZ` | — | the container's clock; the server itself uses the timezone in Settings |
+| `PUID` / `PGID` | `1000` | Docker only: the user and group the server runs as, and that `./data` is given to |
 
 On first start the bundled sources are copied into `/data/sources/`. Each one appears once:
 delete a default you don't want and it stays deleted. In Settings, set your **location** (for
