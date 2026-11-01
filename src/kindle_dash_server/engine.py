@@ -6,6 +6,7 @@ the moon phase and schedule slots are all evaluated at that moment.
 
 from __future__ import annotations
 
+import json
 import logging
 import random
 import threading
@@ -128,35 +129,95 @@ class Engine:
 
     # -- the device's schedule -------------------------------------------------------------------
 
-    def device_schedule(self) -> tuple[DeviceSchedule, str]:
-        """(schedule, origin): origin is "device" when reported by the Kindle, else "settings"."""
+    def _reported_schedule(self) -> DeviceSchedule | None:
+        reported = self.state.get("device_schedule")
+        if not reported:
+            return None
+        try:
+            return DeviceSchedule.create(
+                reported["schedule"], reported["timezone"], reported.get("sleep_after")
+            )
+        except Exception as exc:
+            log.warning("ignoring the schedule reported by the device: %s", exc)
+            return None
+
+    def desired_schedule(self) -> DeviceSchedule:
+        """The schedule from Settings, in the Kindle's timezone when it has reported one."""
         sch = self.settings.scheduler
-        reported = self.state.get("device_schedule") if sch.follow_device else None
+        reported = self.state.get("device_schedule") or {}
+        tz = sch.timezone or reported.get("timezone") or self.settings.location.timezone
+        return DeviceSchedule.create(sch.schedule, tz, sch.sleep_after)
+
+    def schedule_status(self) -> str | None:
+        """In "server" mode: pending (not sent yet), sent (the Kindle got it with its last
+        image), applied (the Kindle reports it), rejected (it fetched again but still reports
+        something else: ALLOW_SERVER_SCHEDULE isn't on, or it refused the value)."""
+        if self.settings.scheduler.mode != "server":
+            return None
+        desired = self.desired_schedule()
+        want = (desired.cron.expr, int(desired.sleep_after))
+        reported = self.state.get("device_schedule") or {}
+        if (reported.get("schedule"), reported.get("sleep_after")) == want:
+            return "applied"
+        sent = self.state.get("schedule_sent") or {}
+        if (sent.get("schedule"), sent.get("sleep_after")) != want:
+            return "pending"
+        last_seen = (self.state.get("device") or {}).get("last_seen") or 0
+        return "rejected" if last_seen > sent.get("at", 0) + 1 else "sent"
+
+    def device_schedule(self) -> tuple[DeviceSchedule, str]:
+        """(schedule the Kindle follows, origin): origin is "device" (reported by the Kindle),
+        "server" (set from here and sent to it) or "settings"."""
+        sch = self.settings.scheduler
+        status = self.schedule_status()
         key = (
-            reported
-            and (reported.get("schedule"), reported.get("timezone"), reported.get("sleep_after")),
-            sch.schedule,
-            sch.timezone,
-            sch.sleep_after,
+            sch.model_dump_json(),
+            json.dumps(self.state.get("device_schedule"), sort_keys=True),
+            status,
             self.settings.location.timezone,
         )
         if self._schedule_cache and self._schedule_cache[0] == key:
             return self._schedule_cache[1], self._schedule_cache[2]
         schedule, origin = None, "settings"
-        if reported:
-            try:
-                schedule = DeviceSchedule.create(
-                    reported["schedule"], reported["timezone"], reported.get("sleep_after")
-                )
-                origin = "device"
-            except Exception as exc:
-                log.warning("ignoring the schedule reported by the device: %s", exc)
+        if sch.mode == "server" and status in ("sent", "applied"):
+            schedule, origin = self.desired_schedule(), "server"
+        elif sch.mode in ("device", "server"):
+            # Device mode, or a server schedule the Kindle hasn't taken (yet): it keeps its own.
+            schedule = self._reported_schedule()
+            origin = "device" if schedule else origin
         if schedule is None:
-            schedule = DeviceSchedule.create(
-                sch.schedule, sch.timezone or self.settings.location.timezone, sch.sleep_after
-            )
+            schedule = self.desired_schedule()
+            origin = "server" if sch.mode == "server" else "settings"
         self._schedule_cache = (key, schedule, origin)
         return schedule, origin
+
+    def schedule_headers(self) -> dict[str, str]:
+        """Response headers for the Kindle's request, and remembers what was sent.
+
+        Server mode: the schedule from Settings. After leaving server mode, "default" once,
+        so the Kindle drops the override and goes back to its env.sh."""
+        sent = self.state.get("schedule_sent")
+        if self.settings.scheduler.mode == "server":
+            desired = self.desired_schedule()
+            value = {"schedule": desired.cron.expr, "sleep_after": int(desired.sleep_after)}
+            if not sent or {k: sent.get(k) for k in value} != value:
+                self.state.set("schedule_sent", {**value, "at": time.time()})
+                self.state.event(
+                    "info",
+                    f"sent schedule to the Kindle: {value['schedule']} "
+                    f"(sleep screen after {value['sleep_after']} s)",
+                )
+                self._schedule_cache = None
+            return {
+                "X-Dash-Schedule": value["schedule"],
+                "X-Dash-Sleep-After": str(value["sleep_after"]),
+            }
+        if sent:
+            self.state.set("schedule_sent", None)
+            self.state.event("info", "told the Kindle to go back to its own env.sh schedule")
+            self._schedule_cache = None
+            return {"X-Dash-Schedule": "default"}
+        return {}
 
     def next_fetch(self, after: datetime | None = None) -> datetime:
         schedule, _ = self.device_schedule()

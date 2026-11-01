@@ -217,14 +217,100 @@ def test_device_schedule_rejected_when_unusable(make_engine):
     assert "unusable schedule" in eng.state.events(1)[0]["message"]
 
 
-def test_follow_device_off_uses_settings(make_engine):
-    eng = make_engine(scheduler={"follow_device": False, "schedule": "0 8 * * *"})
+def test_manual_mode_uses_settings(make_engine):
+    eng = make_engine(scheduler={"mode": "manual", "schedule": "0 8 * * *"})
     eng.record_device_request(
         {"x-kindle-schedule": "*/15 * * * *", "x-kindle-timezone": "Europe/Rome"}, None
     )
     sched, origin = eng.device_schedule()
     assert origin == "settings" and sched.cron.expr == "0 8 * * *"
     assert isinstance(sched, DeviceSchedule)
+    assert eng.schedule_headers() == {}  # nothing is sent to the Kindle
+
+
+def test_legacy_follow_device_setting_is_migrated(make_engine):
+    eng = make_engine(scheduler={"follow_device": False})
+    assert eng.settings.scheduler.mode == "manual"
+
+
+KINDLE_OLD = {
+    "x-kindle-schedule": "*/15 7-22 * * *",
+    "x-kindle-timezone": "Europe/Rome",
+    "x-kindle-sleep-after": "960",
+}
+KINDLE_NEW = {**KINDLE_OLD, "x-kindle-schedule": "*/30 6-21 * * *", "x-kindle-sleep-after": "1860"}
+
+
+def test_server_mode_sends_the_schedule_and_tracks_it(make_engine, monkeypatch):
+    clock = [1_000_000.0]
+    monkeypatch.setattr(time, "time", lambda: clock[0])
+    eng = make_engine(scheduler={"mode": "server", "schedule": "*/30 6-21 * * *"})
+    eng.record_device_request(KINDLE_OLD, None)
+
+    # Not sent yet: the Kindle still follows its own schedule.
+    assert eng.schedule_status() == "pending"
+    assert eng.device_schedule()[0].cron.expr == "*/15 7-22 * * *"
+
+    # The next image carries it.
+    assert eng.schedule_headers() == {
+        "X-Dash-Schedule": "*/30 6-21 * * *",
+        "X-Dash-Sleep-After": "1860",
+    }
+    assert eng.schedule_status() == "sent"
+    sched, origin = eng.device_schedule()
+    assert origin == "server" and sched.cron.expr == "*/30 6-21 * * *"
+    # Planned with the new schedule: every 30 min; the 21:30 wake-up shows the sleep screen
+    # (next slot 06:00), so after 21:00 the next fetch is 06:00.
+    assert eng.next_fetch(at(2026, 11, 2, 20, 10)) == at(2026, 11, 2, 20, 30)
+    assert eng.next_fetch(at(2026, 11, 2, 21, 10)) == at(2026, 11, 3, 6, 0)
+
+    # Sending again changes nothing; the Kindle confirms on its next request.
+    eng.schedule_headers()
+    clock[0] += 1800
+    eng.record_device_request(KINDLE_NEW, None)
+    assert eng.schedule_status() == "applied"
+    assert eng.device_schedule()[1] == "server"
+
+
+def test_server_mode_detects_a_kindle_that_ignores_it(make_engine, monkeypatch):
+    clock = [1_000_000.0]
+    monkeypatch.setattr(time, "time", lambda: clock[0])
+    eng = make_engine(scheduler={"mode": "server", "schedule": "*/30 6-21 * * *"})
+    eng.record_device_request(KINDLE_OLD, None)
+    eng.schedule_headers()
+    clock[0] += 900
+    eng.record_device_request(KINDLE_OLD, None)  # fetched again, still the old schedule
+    assert eng.schedule_status() == "rejected"
+    sched, origin = eng.device_schedule()
+    assert origin == "device" and sched.cron.expr == "*/15 7-22 * * *"  # plan with reality
+
+
+def test_leaving_server_mode_sends_default_once(make_engine):
+    eng = make_engine(scheduler={"mode": "server", "schedule": "*/30 6-21 * * *"})
+    eng.schedule_headers()
+    eng.save_settings(
+        eng.settings.model_copy(
+            update={"scheduler": eng.settings.scheduler.model_copy(update={"mode": "device"})}
+        )
+    )
+    assert eng.schedule_headers() == {"X-Dash-Schedule": "default"}
+    assert eng.schedule_headers() == {}
+
+
+def test_server_mode_refuses_what_the_kindle_would_refuse():
+    import pytest
+    from pydantic import ValidationError
+
+    from kindle_dash_server.config import SchedulerSettings
+    from kindle_dash_server.cron import device_accepts
+
+    with pytest.raises(ValidationError, match="at most one refresh every 5 min"):
+        SchedulerSettings(mode="server", schedule="*/2 * * * *", sleep_after=180)
+    SchedulerSettings(mode="device", schedule="*/2 * * * *", sleep_after=180)  # fine to follow
+    assert device_accepts("0,30 7-22 * * MON-FRI") is None
+    assert device_accepts("0-59/10 * * * *")  # ranges in the minute field aren't accepted
+    assert device_accepts("0,1,2,3,4,5,6,7,8,9,10,11,12 * * * *")
+    assert device_accepts("*/10 * * * *", min_minutes=15)
 
 
 PLUGIN = '''

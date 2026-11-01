@@ -13,16 +13,32 @@
 <form method="post" action="/settings" class="settings">
   <fieldset id="scheduler">
     <legend>Refresh schedule (synced with the Kindle)</legend>
-    <p>The image is rendered once, shortly before each time the Kindle fetches it, and never in between.</p>
-    <p>Now using <code>{{ schedule.cron.expr }}</code> in {{ schedule.timezone }}, sleep screen when the next refresh is more than {{ schedule.sleep_after | int }} s away —
-      {% if origin == 'device' %}<strong>reported by the Kindle</strong>{% if reported %} ({{ reported.received_at | ago }}){% endif %}.
-      {% else %}<strong>from the fields below</strong>{% if s.scheduler.follow_device %}: the Kindle hasn't reported its schedule (it needs kindle-dash-pw3 with the schedule headers, see the README){% endif %}.{% endif %}</p>
-    <label>{{ check('scheduler.follow_device', s.scheduler.follow_device) }} Follow the schedule the Kindle reports (<code>X-Kindle-Schedule</code> headers)</label>
-    <p class="muted">Fallback / manual, copy from the Kindle's <code>local/env.sh</code>:</p>
+    <p>The image is rendered once, shortly before each time the Kindle fetches it, and never in between.
+      Now: <code>{{ schedule.cron.expr }}</code> in {{ schedule.timezone }}, sleep screen when the next refresh
+      is more than {{ schedule.sleep_after | int }} s away
+      {%- if origin == 'device' %} — <strong>reported by the Kindle</strong>{% if reported %} ({{ reported.received_at | ago }}){% endif %}
+      {%- elif origin == 'server' %} — <strong>set from here</strong>
+      {%- else %} — <strong>from the fields below</strong>{% endif %}.</p>
+    {% include "_schedule_status.html" %}
+
+    <label class="radio"><input type="radio" name="scheduler.mode" value="device" {% if s.scheduler.mode == 'device' %}checked{% endif %}>
+      <strong>The Kindle's own schedule</strong> (its <code>env.sh</code>, reported with each request; kindle-dash-pw3 pw3-v0.3.0+).
+      The fields below are used until it has reported one.</label>
+    <label class="radio"><input type="radio" name="scheduler.mode" value="server" {% if s.scheduler.mode == 'server' %}checked{% endif %}>
+      <strong>Set the Kindle's schedule from here</strong>: the fields below are sent with the next image
+      and the Kindle uses them from then on. Needs <code>ALLOW_SERVER_SCHEDULE=true</code> in the Kindle's <code>env.sh</code>
+      (kindle-dash-pw3 with server schedules). Switching away sends the Kindle back to its <code>env.sh</code>.</label>
+    <label class="radio"><input type="radio" name="scheduler.mode" value="manual" {% if s.scheduler.mode == 'manual' %}checked{% endif %}>
+      <strong>Manual</strong>: the fields below, copied from <code>env.sh</code> (older kindle-dash-pw3 that doesn't report its schedule).</label>
+
     <label>Schedule <input name="scheduler.schedule" value="{{ s.scheduler.schedule }}" size="24">
-      <span class="muted">same as REFRESH_SCHEDULE: <code>*/INTERVAL_MINUTES ACTIVE_HOURS * * *</code></span></label>
-    <label>Timezone <input name="scheduler.timezone" value="{{ s.scheduler.timezone or '' }}" placeholder="{{ s.location.timezone }}" size="20"> <span class="muted">TIMEZONE (empty: location's)</span></label>
-    <label>Sleep screen after {{ num('scheduler.sleep_after', s.scheduler.sleep_after, 60) }} s <span class="muted">SLEEP_SCREEN_INTERVAL (empty: interval + 60 s)</span></label>
+      <span class="muted">cron, like REFRESH_SCHEDULE: <code>*/15 7-22 * * *</code> = every 15 min from 07:00 to 22:45; <code>*/30 7-22 * * MON-FRI</code></span></label>
+    <label>Timezone <input name="scheduler.timezone" value="{{ s.scheduler.timezone or '' }}" placeholder="{{ (reported or {}).get('timezone') or s.location.timezone }}" size="20">
+      <span class="muted">TIMEZONE (empty: the Kindle's, else the location's)</span></label>
+    <label>Sleep screen after {{ num('scheduler.sleep_after', s.scheduler.sleep_after, 60) }} s
+      <span class="muted">SLEEP_SCREEN_INTERVAL (empty: the usual interval + 60 s)</span></label>
+    <label>The Kindle refuses schedules more often than every {{ num('scheduler.server_min_minutes', s.scheduler.server_min_minutes, 1, 60) }} min
+      <span class="muted">its SERVER_SCHEDULE_MIN_MINUTES (default 5)</span></label>
     <label>Render {{ num('scheduler.lead_seconds', s.scheduler.lead_seconds, 5, 3600) }} s before each fetch</label>
   </fieldset>
 

@@ -29,7 +29,9 @@
     <dt>Schedule</dt>
     <dd><code>{{ schedule.cron.expr }}</code> {{ schedule.timezone }}
       {% if origin == 'device' %}<span class="tag">from the Kindle</span>
-      {% else %}<span class="muted">(from <a href="/settings#scheduler">settings</a>{% if settings.scheduler.follow_device %}: the Kindle hasn't reported its schedule yet{% endif %})</span>{% endif %}
+      {% elif origin == 'server' %}<span class="tag">set from here</span>
+      {% else %}<span class="muted">(from <a href="/settings#scheduler">settings</a>{% if settings.scheduler.mode == 'device' %}: the Kindle hasn't reported its schedule yet{% endif %})</span>{% endif %}
+      {% include "_schedule_status.html" %}
     </dd>
     <dt>Next fetch</dt>
     <dd>{% if next_fetch %}{{ next_fetch.strftime('%a %H:%M') }}, rendered at {{ next_run.strftime('%H:%M:%S') }}{% else %}—{% endif %}</dd>

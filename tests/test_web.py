@@ -257,3 +257,39 @@ def test_healthz(setup):
         h = c.get("/healthz").json()
         assert h["status"] == "ok" and h["has_image"] is True
         assert h["rendered_for"]  # rendered for a specific upcoming fetch
+
+
+def test_server_mode_round_trip(setup):
+    with client(setup) as c:
+        r = c.post(
+            "/settings", data={"scheduler.mode": "server", "scheduler.schedule": "*/30 6-21 * * *"}
+        )
+        assert "Saved" in r.text and "Will be sent to the Kindle" in r.text
+        kindle = {
+            "X-Kindle-Schedule": "*/15 7-22 * * *",
+            "X-Kindle-Timezone": "Europe/Rome",
+            "X-Kindle-Sleep-After": "960",
+        }
+        r = c.get("/dash.png", headers=kindle)
+        assert r.headers["x-dash-schedule"] == "*/30 6-21 * * *"
+        assert r.headers["x-dash-sleep-after"] == "1860"
+        assert "Sent with the last image" in c.get("/status").text
+        time.sleep(1.1)
+        c.get(
+            "/dash.png",
+            headers={
+                **kindle,
+                "X-Kindle-Schedule": "*/30 6-21 * * *",
+                "X-Kindle-Sleep-After": "1860",
+            },
+        )
+        assert "Applied" in c.get("/settings").text
+
+        r = c.post(
+            "/settings", data={"scheduler.mode": "server", "scheduler.schedule": "*/2 * * * *"}
+        )
+        assert r.status_code == 422 and "at most one refresh every 5 min" in r.text
+
+        c.post("/settings", data={"scheduler.mode": "device"})
+        assert c.get("/dash.png").headers["x-dash-schedule"] == "default"
+        assert "x-dash-schedule" not in c.get("/dash.png").headers

@@ -8,6 +8,7 @@ day-of-month and day-of-week are restricted, a day matching either one matches.
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -26,6 +27,33 @@ _DAYS = {d: i for i, d in enumerate(["SUN", "MON", "TUE", "WED", "THU", "FRI", "
 
 class CronError(ValueError):
     pass
+
+
+def device_accepts(expr: str, min_minutes: int = 5) -> str | None:
+    """Why kindle-dash-pw3 would refuse this schedule from a server (X-Dash-Schedule), or None.
+
+    Mirrors ``apply_server_schedule`` / ``minute_field_ok`` in dash.sh: 5 fields, letters,
+    digits and ``* / , -`` only, and at most one refresh every ``min_minutes`` (minute field
+    ``*/N`` with N >= min_minutes, or a list of at most 60 / min_minutes minutes).
+    """
+    fields = expr.split()
+    if len(fields) != 5:
+        return "expected 5 fields"
+    if re.search(r"[^0-9A-Za-z*/, -]", expr):
+        return "only letters, digits and * / , - are allowed"
+    minute = fields[0]
+    if minute.startswith("*/"):
+        ok = minute[2:].isdigit() and int(minute[2:]) >= min_minutes
+    elif re.fullmatch(r"[0-9,]+", minute):
+        ok = len([m for m in minute.split(",") if m]) <= 60 // min_minutes
+    else:
+        ok = False
+    if not ok:
+        return (
+            f"the Kindle accepts at most one refresh every {min_minutes} min: use */N "
+            f"(N >= {min_minutes}) or a short list of minutes in the minute field"
+        )
+    return None
 
 
 def _parse_field(text: str, lo: int, hi: int, names: dict[str, int] | None = None) -> set[int]:

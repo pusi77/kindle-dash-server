@@ -71,3 +71,6 @@ form.settings label.radio { margin: .6rem 0; }
 .checks label { margin: .1rem 0 !important; }
 table.slots { border-collapse: collapse; margin: .4rem 0 .8rem; }
 table.slots td, table.slots th { padding: .2rem .5rem .2rem 0; text-align: left; }
+.schedule-status { margin: .3rem 0 .6rem; }
+.schedule-status.rejected { color: var(--err); }
+.schedule-status.applied { color: #3f6b35; }

@@ -476,12 +476,17 @@ def create_app(env: Env | None = None) -> FastAPI:
         png = engine.current_png
         if png is None:
             return Response("nothing rendered yet", status_code=503)
-        if request.method == "GET" and engine.record_device_request(
-            dict(request.headers), request.client.host if request.client else None
-        ):
-            sched(request).reschedule()
+        headers = dict(NO_STORE)
+        if request.method == "GET":
+            before = engine.device_schedule()
+            engine.record_device_request(
+                dict(request.headers), request.client.host if request.client else None
+            )
+            headers.update(engine.schedule_headers())
+            if engine.device_schedule() != before:
+                sched(request).reschedule()
         cur = engine.state.get("current") or {}
-        headers = {**NO_STORE, "X-Rendered-At": str(int(cur.get("rendered_at") or 0))}
+        headers["X-Rendered-At"] = str(int(cur.get("rendered_at") or 0))
         return Response(png, media_type="image/png", headers=headers)
 
     return app
@@ -661,6 +666,8 @@ def _settings(
             "error": error,
             "saved": saved,
             "fonts": available_families(),
+            "schedule_status": engine.schedule_status(),
+            "next_fetch": engine.next_fetch(),
             "schedule": schedule,
             "origin": origin,
             "reported": engine.state.get("device_schedule"),
@@ -720,6 +727,8 @@ def _dashboard_ctx(request: Request, flash: Any = None) -> dict[str, Any]:
         and battery <= s.battery.show_below,
         "schedule": schedule,
         "origin": origin,
+        "schedule_status": engine.schedule_status(),
+        "reported": engine.state.get("device_schedule"),
         "next_fetch": next_fetch,
         "next_run": next_fetch - timedelta(seconds=s.scheduler.lead_seconds),
         "pinned_name": (

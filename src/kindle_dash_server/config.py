@@ -136,19 +136,25 @@ def _check_tz(v: str | None) -> str | None:
 class SchedulerSettings(StrictModel):
     """When to render: shortly before each time the Kindle will fetch.
 
-    With ``follow_device`` the schedule comes from the Kindle itself (kindle-dash-pw3 sends
-    X-Kindle-Schedule / X-Kindle-Timezone / X-Kindle-Sleep-After). Until it has been seen, or
-    with ``follow_device: false``, the values below are used: copy them from env.sh.
+    ``mode``:
+
+    * ``device``: follow the schedule the Kindle reports (kindle-dash-pw3 >= pw3-v0.3.0 sends
+      X-Kindle-Schedule / -Timezone / -Sleep-After). Until it's been seen, the values below.
+    * ``manual``: the values below, copied from the Kindle's env.sh.
+    * ``server``: the values below are *sent* to the Kindle (X-Dash-Schedule /
+      X-Dash-Sleep-After), which applies them if its env.sh has ALLOW_SERVER_SCHEDULE=true.
     """
 
-    follow_device: bool = True
+    mode: Literal["device", "manual", "server"] = "device"
     # Same syntax as REFRESH_SCHEDULE: "*/INTERVAL_MINUTES ACTIVE_HOURS * * *".
     schedule: str = "*/15 7-22 * * *"
-    # TIMEZONE from env.sh. Empty: location.timezone.
+    # TIMEZONE from env.sh. Empty: the one the Kindle reports, else location.timezone.
     timezone: str | None = None
     # SLEEP_SCREEN_INTERVAL: a wake-up whose next slot is further away shows the sleep screen
     # instead of fetching. Empty: the schedule's usual interval + 60 s (dash.sh's default).
     sleep_after: int | None = Field(None, ge=60)
+    # The Kindle's SERVER_SCHEDULE_MIN_MINUTES: denser schedules would be refused by it.
+    server_min_minutes: int = Field(5, ge=1, le=60)
     # How long before each fetch to render.
     lead_seconds: int = Field(60, ge=5, le=3600)
 
@@ -157,6 +163,9 @@ class SchedulerSettings(StrictModel):
     def _legacy(cls, data: Any) -> Any:
         if isinstance(data, dict):
             data = {k: v for k, v in data.items() if k != "interval_minutes"}
+            if "follow_device" in data:
+                follow = data.pop("follow_device")
+                data.setdefault("mode", "device" if follow in (True, "true") else "manual")
         return data
 
     @field_validator("schedule")
@@ -168,9 +177,13 @@ class SchedulerSettings(StrictModel):
 
     @model_validator(mode="after")
     def _fetches(self) -> SchedulerSettings:
-        from .cron import DeviceSchedule
+        from .cron import DeviceSchedule, device_accepts
 
         DeviceSchedule.create(self.schedule, self.timezone or "UTC", self.sleep_after)
+        if self.mode == "server":
+            reason = device_accepts(self.schedule, self.server_min_minutes)
+            if reason:
+                raise ValueError(f"schedule {self.schedule!r}: {reason}")
         return self
 
     @field_validator("timezone")

@@ -95,6 +95,7 @@ and set a token.
 |---|---|
 | Request | `GET <DASH_URL>`, 30 s timeout, retried 3 times |
 | Headers sent | `X-Kindle-Battery: 0-100`, `X-Kindle-Schedule`, `X-Kindle-Timezone`, `X-Kindle-Sleep-After` (pw3-v0.3.0+), `Authorization: Bearer <DASH_TOKEN>` if set |
+| Headers received | `X-Dash-Schedule`, `X-Dash-Sleep-After`, only in "set from here" mode, applied only with `ALLOW_SERVER_SCHEDULE=true` |
 | Image | PNG, **1072×1448 portrait**, **8-bit greyscale (colour type 0), no alpha**, drawn 1:1 from the top-left corner with no scaling or rotation |
 | Grey levels | 16: 0x00, 0x11 … 0xFF |
 | Errors | anything but 200 → the previous image stays on screen |
@@ -137,6 +138,22 @@ then nothing until 06:59 the next day: at 22:45 the Kindle shows its sleep scree
 fetching. Each image is made **for** the moment it will be fetched, so daily picks, dates, the
 moon phase and schedule slots are evaluated at 07:00, not at 06:59. The time between render and
 fetch is configurable (default 60 s).
+
+#### Setting the Kindle's schedule from the browser
+
+Settings → Refresh schedule has three modes:
+
+- **The Kindle's own schedule** (default): follow what the Kindle reports, as above.
+- **Set the Kindle's schedule from here**: the schedule you enter is sent with the next image as
+  `X-Dash-Schedule` / `X-Dash-Sleep-After`. The Kindle uses it from its next wake-up and confirms
+  it on the following request. The page shows *will be sent*, *sent*, *applied*, or *not
+  applied* (with the reason). This needs kindle-dash-pw3 with server schedules and
+  `ALLOW_SERVER_SCHEDULE=true` in its `local/env.sh`: the Kindle only accepts what it's allowed
+  to and validates everything. It refuses anything more frequent than every
+  `SERVER_SCHEDULE_MIN_MINUTES` (default 5), and the server refuses the same schedules before
+  sending them. Switching to another mode sends `default`, and the Kindle goes back to its
+  `env.sh`.
+- **Manual**: the values typed here, for a kindle-dash-pw3 too old to report its schedule.
 
 The dashboard shows the schedule in use and whether it came from the Kindle, as well as the
 battery level the Kindle reported. A schedule that would never fetch (an interval longer than
@@ -394,8 +411,8 @@ canvas and scale with it.
 
 Settings are stored in `/data/settings.yaml` and edited on the Settings page:
 
-- **Refresh schedule**: follow the schedule the Kindle reports, or the fallback values from
-  `env.sh`; how long before each fetch to render.
+- **Refresh schedule**: follow the schedule the Kindle reports, set it from here, or enter
+  it manually; how long before each fetch to render.
 - **Device**: image path (default `/dash.png`), optional token (`DASH_TOKEN`), low-battery
   badge threshold and corner.
 - **Output**: size, rotation, grey levels, dithering, auto-contrast, paper white, gamma. The
