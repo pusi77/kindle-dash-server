@@ -1,0 +1,11 @@
+{% if schedule_status %}
+<p class="schedule-status {{ schedule_status }}">
+  {% if schedule_status == 'pending' %}⏳ Will be sent to the Kindle with its next image{% if next_fetch %} ({{ next_fetch.strftime('%a %H:%M') }}){% endif %}.
+  {% elif schedule_status == 'sent' %}📨 Sent with the last image; the Kindle uses it from its next wake-up and confirms on the following request.
+  {% elif schedule_status == 'applied' %}✓ Applied: the Kindle reports this schedule.
+  {% elif schedule_status == 'rejected' %}⚠ Not applied: the Kindle fetched again and still reports
+    <code>{{ (reported or {}).get('schedule', 'no schedule') }}</code>. Set <code>ALLOW_SERVER_SCHEDULE=true</code> in its
+    <code>local/env.sh</code> (kindle-dash-pw3 with server schedules) and restart it, or check its log for "Ignoring server schedule".
+  {% endif %}
+</p>
+{% endif %}

@@ -1,0 +1,27 @@
+# Wikimedia Commons picture of the day, from Wikipedia's featured-content feed.
+# Licences vary (often CC BY-SA): the author and licence are always shown.
+# Change "en" for another Wikipedia language.
+type: json_api
+name: Wikimedia — picture of the day
+description: Today's featured picture from Wikimedia Commons, with its description.
+enabled: true
+url: "https://en.wikipedia.org/api/rest_v1/feed/featured/{{ today.strftime('%Y/%m/%d') }}"
+items: image
+pick: first
+fields:
+  # A 1280 px thumbnail (Wikimedia only serves standard sizes), else the original.
+  image:
+    - "{{ thumbnail.source | regex_replace('/[0-9]+px-', '/1280px-', 1) if thumbnail else '' }}"
+    - image.source
+  body: description.text
+  credit: "{{ artist.text | striptags | truncate(80) }} · {{ license.type }} · Wikimedia Commons"
+  license: license.type
+  url: file_page
+  kicker: "'Picture of the day'"
+layout: article
+layout_options:
+  image_height: 0.58
+  body_max_size: 34
+refresh: 6h
+response_ttl: 6h
+weight: 1

@@ -1,0 +1,10 @@
+# Bundled public-domain aphorisms (see the file header for the translations used).
+type: text_file
+name: Aphorisms
+description: Seneca, Marcus Aurelius, La Rochefoucauld, Wilde and friends.
+enabled: true
+path: builtin:texts/aphorisms.txt
+pick: random
+layout: quote
+refresh: 15m
+weight: 1

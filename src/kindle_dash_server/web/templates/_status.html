@@ -1,0 +1,52 @@
+<section id="status" class="status" hx-get="/status" hx-trigger="every 60s" hx-swap="outerHTML">
+  {% if flash %}
+    <p class="flash {{ 'ok' if flash.ok else 'err' }}">
+      {% if flash.ok %}Rendered in {{ '%.1f' % flash.duration }} s.{% else %}{{ flash.message }}{% endif %}
+    </p>
+    <script>document.getElementById('current').src = '/current.png?t=' + Date.now();</script>
+  {% endif %}
+  <h2>On screen</h2>
+  <dl>
+    <dt>Source</dt><dd>{{ current_name or '—' }}</dd>
+    <dt>Rendered</dt><dd>{{ rendered_at }}{% if rendered_for %} for the {{ rendered_for }} fetch{% endif %}{% if current.reason %} <span class="muted">({{ current.reason }})</span>{% endif %}</dd>
+    <dt>Mode</dt>
+    <dd>
+      {% if settings.selection.mode == 'pinned' %}
+        pinned: <strong>{{ pinned_name }}</strong>
+        <button class="link" hx-post="/selection/rotation">switch to rotation</button>
+      {% else %}
+        {{ settings.selection.mode }} ({{ settings.selection.strategy | replace('_', ' ') }},
+        {{ enabled_count }} enabled source{{ 's' if enabled_count != 1 }})
+      {% endif %}
+      · <a href="/display">change</a>
+    </dd>
+    <dt>Kindle</dt>
+    <dd>
+      {% if device.last_seen %}last fetch {{ device_seen }}{% if device.battery is not none %},
+        battery <span class="{{ 'error' if battery_low }}">{{ device.battery }}%{% if battery_low %} — low{% endif %}</span>{% endif %}
+      {% else %}hasn't fetched yet{% endif %}
+    </dd>
+    <dt>Schedule</dt>
+    <dd><code>{{ schedule.cron.expr }}</code> {{ schedule.timezone }}
+      {% if origin == 'device' %}<span class="tag">from the Kindle</span>
+      {% elif origin == 'server' %}<span class="tag">set from here</span>
+      {% else %}<span class="muted">(from <a href="/settings#scheduler">settings</a>{% if settings.scheduler.mode == 'device' %}: the Kindle hasn't reported its schedule yet{% endif %})</span>{% endif %}
+      {% include "_schedule_status.html" %}
+    </dd>
+    <dt>Next fetch</dt>
+    <dd>{% if next_fetch %}{{ next_fetch.strftime('%a %H:%M') }}, rendered at {{ next_run.strftime('%H:%M:%S') }}{% else %}—{% endif %}</dd>
+  </dl>
+  <button class="primary" hx-post="/render-now" hx-target="#status" hx-swap="outerHTML"
+          hx-indicator="#spin" hx-disabled-elt="this">Render now</button>
+  <span id="spin" class="htmx-indicator">rendering…</span>
+
+  <h3>Recent events</h3>
+  <ul class="events">
+    {% for e in events %}
+      <li class="{{ e.level }}"><time>{{ fmt_time(e.ts, tz)[5:] }}</time>
+        {% if e.source_id %}<b>{{ e.source_id }}</b>{% endif %} {{ e.message }}</li>
+    {% else %}
+      <li class="muted">nothing yet</li>
+    {% endfor %}
+  </ul>
+</section>

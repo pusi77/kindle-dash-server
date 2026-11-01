@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% set active = 'settings' %}
+{% macro num(name, value, min=None, max=None, step=1, size=6) -%}
+<input type="number" name="{{ name }}" value="{{ value if value is not none else '' }}" {% if min is not none %}min="{{ min }}"{% endif %} {% if max is not none %}max="{{ max }}"{% endif %} step="{{ step }}" style="width: {{ size }}em">
+{%- endmacro %}
+{% macro check(name, value) -%}
+<input type="hidden" name="{{ name }}" value="false"><input type="checkbox" name="{{ name }}" value="true" {% if value %}checked{% endif %}>
+{%- endmacro %}
+{% block content %}
+<h1>Settings</h1>
+{% if saved %}<div class="flash ok">Saved.</div>{% endif %}
+{% if error %}<div class="flash err"><strong>Not saved:</strong><pre>{{ error }}</pre></div>{% endif %}
+<form method="post" action="/settings" class="settings">
+  <fieldset id="scheduler">
+    <legend>Refresh schedule (synced with the Kindle)</legend>
+    <p>The image is rendered once, shortly before each time the Kindle fetches it, and never in between.
+      Now: <code>{{ schedule.cron.expr }}</code> in {{ schedule.timezone }}, sleep screen when the next refresh
+      is more than {{ schedule.sleep_after | int }} s away
+      {%- if origin == 'device' %} — <strong>reported by the Kindle</strong>{% if reported %} ({{ reported.received_at | ago }}){% endif %}
+      {%- elif origin == 'server' %} — <strong>set from here</strong>
+      {%- else %} — <strong>from the fields below</strong>{% endif %}.</p>
+    {% include "_schedule_status.html" %}
+
+    <label class="radio"><input type="radio" name="scheduler.mode" value="device" {% if s.scheduler.mode == 'device' %}checked{% endif %}>
+      <strong>The Kindle's own schedule</strong> (its <code>env.sh</code>, reported with each request; kindle-dash-pw3 pw3-v0.3.0+).
+      The fields below are used until it has reported one.</label>
+    <label class="radio"><input type="radio" name="scheduler.mode" value="server" {% if s.scheduler.mode == 'server' %}checked{% endif %}>
+      <strong>Set the Kindle's schedule from here</strong>: the fields below are sent with the next image
+      and the Kindle uses them from then on. Needs <code>ALLOW_SERVER_SCHEDULE=true</code> in the Kindle's <code>env.sh</code>
+      (kindle-dash-pw3 with server schedules). Switching away sends the Kindle back to its <code>env.sh</code>.</label>
+    <label class="radio"><input type="radio" name="scheduler.mode" value="manual" {% if s.scheduler.mode == 'manual' %}checked{% endif %}>
+      <strong>Manual</strong>: the fields below, copied from <code>env.sh</code> (older kindle-dash-pw3 that doesn't report its schedule).</label>
+
+    <label>Schedule <input name="scheduler.schedule" value="{{ s.scheduler.schedule }}" size="24">
+      <span class="muted">cron, like REFRESH_SCHEDULE: <code>*/15 7-22 * * *</code> = every 15 min from 07:00 to 22:45; <code>*/30 7-22 * * MON-FRI</code></span></label>
+    <label>Timezone <input name="scheduler.timezone" value="{{ s.scheduler.timezone or '' }}" placeholder="{{ (reported or {}).get('timezone') or s.location.timezone }}" size="20">
+      <span class="muted">TIMEZONE (empty: the Kindle's, else the location's)</span></label>
+    <label>Sleep screen after {{ num('scheduler.sleep_after', s.scheduler.sleep_after, 60) }} s
+      <span class="muted">SLEEP_SCREEN_INTERVAL (empty: the usual interval + 60 s)</span></label>
+    <label>The Kindle refuses schedules more often than every {{ num('scheduler.server_min_minutes', s.scheduler.server_min_minutes, 1, 60) }} min
+      <span class="muted">its SERVER_SCHEDULE_MIN_MINUTES (default 5)</span></label>
+    <label>Render {{ num('scheduler.lead_seconds', s.scheduler.lead_seconds, 5, 3600) }} s before each fetch</label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Device</legend>
+    <label>Image path <input name="device.path" value="{{ s.device.path }}" size="24"> <span class="muted">DASH_URL = http://&lt;this server&gt;:8080<em>{{ s.device.path }}</em></span></label>
+    <label>Token <input name="device.token" value="{{ s.device.token or '' }}" size="40" autocomplete="off"> <span class="muted">DASH_TOKEN; empty = no token</span></label>
+    <label>Low-battery badge at or below {{ num('battery.show_below', s.battery.show_below, 0, 100) }} % <span class="muted">(0 = never)</span>
+      <select name="battery.position">{% for p in ['top-right', 'top-left', 'bottom-right', 'bottom-left'] %}<option {% if s.battery.position == p %}selected{% endif %}>{{ p }}</option>{% endfor %}</select></label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Output</legend>
+    <label>Size {{ num('output.width', s.output.width, 16, 4096) }} × {{ num('output.height', s.output.height, 16, 4096) }} px
+      <span class="muted">PW3: 1072 × 1448</span></label>
+    <label>Rotation <select name="output.rotation">{% for r in [0, 90, 180, 270] %}<option value="{{ r }}" {% if s.output.rotation == r %}selected{% endif %}>{{ r }}°{% if r in (90, 270) %} (landscape){% endif %}</option>{% endfor %}</select>
+      <span class="muted">clockwise, for a device mounted sideways</span></label>
+    <label>Grey levels {{ num('output.gray_levels', s.output.gray_levels, 2, 256) }} <span class="muted">PW3: 16</span></label>
+    <label>Dithering <select name="output.dither">{% for d in ['floyd_steinberg', 'atkinson', 'ordered', 'none'] %}<option value="{{ d }}" {% if s.output.dither == d %}selected{% endif %}>{{ d | replace('_', '–') }}</option>{% endfor %}</select></label>
+    <label>{{ check('output.autocontrast', s.output.autocontrast) }} Auto-contrast images:
+      clip {{ num('output.black_cutoff', s.output.black_cutoff, 0, 40, 0.1) }} % to black,
+      {{ num('output.white_cutoff', s.output.white_cutoff, 0, 40, 0.1) }} % to white</label>
+    <label>{{ check('output.paper_white', s.output.paper_white) }} Turn the paper of prints and drawings white</label>
+    <label>Gamma {{ num('output.gamma', s.output.gamma, 0.2, 5, 0.05) }} <span class="muted">&gt; 1 lightens images</span></label>
+    <p class="muted">Format: PNG, 8-bit greyscale (colour type 0), no alpha — what kindle-dash-pw3 draws with <code>eips</code>.</p>
+  </fieldset>
+
+  <fieldset>
+    <legend>Look &amp; location</legend>
+    <label>Font <select name="font">{% for f in fonts %}<option {% if s.font == f %}selected{% endif %}>{{ f }}</option>{% endfor %}</select>
+      <span class="muted">add more in <code>/data/fonts/&lt;name&gt;/regular.ttf</code> (+ italic.ttf, bold.ttf)</span></label>
+    <label>Place <input name="location.name" value="{{ s.location.name }}" size="16"></label>
+    <label>Latitude {{ num('location.latitude', s.location.latitude, -90, 90, 'any', 8) }}
+      Longitude {{ num('location.longitude', s.location.longitude, -180, 180, 'any', 8) }}</label>
+    <label>Timezone <input name="location.timezone" value="{{ s.location.timezone }}" size="20"></label>
+    <label>Contact for API operators <input name="contact" value="{{ s.contact }}" size="30" placeholder="you@example.org"> <span class="muted">added to the User-Agent</span></label>
+  </fieldset>
+  <div class="actions"><button class="primary" type="submit">Save</button></div>
+</form>
+{% endblock %}

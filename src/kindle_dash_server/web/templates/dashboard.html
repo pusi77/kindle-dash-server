@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% set active = 'dashboard' %}
+{% block content %}
+<div class="dash">
+  <figure class="screen">
+    <img id="current" src="/current.png?t={{ stamp }}" alt="What the Kindle shows"
+         width="{{ settings.output.width }}" height="{{ settings.output.height }}">
+  </figure>
+  {% include "_status.html" %}
+</div>
+{% endblock %}

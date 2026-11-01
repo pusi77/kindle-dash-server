@@ -1,0 +1,43 @@
+# Cleveland Museum of Art Open Access API: CC0 prints and drawings.
+# API docs: https://openaccess-api.clevelandart.org/
+type: json_api
+name: Cleveland Museum of Art — prints & drawings
+description: CC0 prints and drawings from the Cleveland Museum of Art.
+enabled: true
+url: https://openaccess-api.clevelandart.org/api/artworks/
+params:
+  cc0: 1
+  has_image: 1
+  # A different type on each request (Jinja's random filter).
+  type: "{{ ['Print', 'Drawing'] | random }}"
+  limit: 100
+  fields: id,title,creation_date,creators,technique,type,url,images
+pages:
+  param: skip          # offset paging: skip = index * step
+  min: 0
+  max: 40
+  step: 100
+  total_items_path: info.total
+  per_page: 100
+items: "data[?images.web.url]"
+pick: random
+fields:
+  image:
+    - images.print.url
+    - images.web.url
+  title: title
+  author: "{{ creators[0].description if creators else '' }}"
+  width: images.print.width
+  height: images.print.height
+  credit: "{{ creation_date }}{% if technique %} · {{ technique }}{% endif %} · Cleveland Museum of Art · CC0"
+  url: url
+constants:
+  license: CC0
+layout: art
+refresh: 1h
+response_ttl: 1d
+weight: 2
+filters:
+  min_aspect: 0.45
+  max_aspect: 1.6
+  min_width: 600

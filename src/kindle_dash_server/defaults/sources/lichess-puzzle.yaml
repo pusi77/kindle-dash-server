@@ -1,0 +1,7 @@
+# Lichess daily puzzle, drawn as a board. API: https://lichess.org/api#tag/Puzzles
+type: lichess_puzzle
+name: Lichess daily puzzle
+description: Today's puzzle from lichess.org (the solution is not shown).
+enabled: true
+refresh: 3h
+weight: 0.5
