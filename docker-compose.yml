@@ -1,7 +1,8 @@
 services:
   kindle-dash-server:
-    build: .
-    image: kindle-dash-server:latest
+    image: ghcr.io/pusi77/kindle-dash-server:latest
+    # To build from this checkout instead of pulling: comment out "image" and uncomment:
+    # build: .
     container_name: kindle-dash-server
     restart: unless-stopped
     ports:
@@ -11,5 +12,7 @@ services:
       - ./data:/data
     environment:
       TZ: Europe/Rome
+      # PUID: 1000            # user/group the server runs as; ./data is given to them
+      # PGID: 1000
       # KDS_BASIC_AUTH: "admin:change-me"   # optional basic auth for the web UI
       # KDS_LOG_LEVEL: DEBUG
